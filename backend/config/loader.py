@@ -25,7 +25,9 @@ class Config:
         # Auth settings
         auth = raw_config.get('auth', {})
         self.auth_enabled = auth.get('enabled', True)
-        self.users = auth.get('users', [])
+        # Admin user is kept in config for initial access
+        self.admin_user = auth.get('adminUser', {})
+        # Other users are stored in database
         
         # Libraries
         self.libraries = raw_config.get('libraries', [])
@@ -33,6 +35,21 @@ class Config:
         # Thumbnail cache
         self.thumbnail_cache_root = raw_config.get('thumbnailCacheRoot', '/data/thumbnails')
         os.makedirs(self.thumbnail_cache_root, exist_ok=True)
+        
+        # Upload root
+        self.upload_root = raw_config.get('uploadRoot', '/data/uploads')
+        os.makedirs(self.upload_root, exist_ok=True)
+        
+        # Limits
+        limits = raw_config.get('limits', {})
+        upload_limits = limits.get('upload', {})
+        self.max_upload_files = upload_limits.get('maxFiles', 500)
+        self.max_upload_bytes_per_file = upload_limits.get('maxBytesPerFile', 500 * 1024 * 1024)
+        self.max_upload_bytes_total = upload_limits.get('maxBytesTotal', 10 * 1024 * 1024 * 1024)
+        
+        download_limits = limits.get('download', {})
+        self.max_download_files = download_limits.get('maxFiles', 10000)
+        self.max_download_bytes = download_limits.get('maxBytes', 20 * 1024 * 1024 * 1024)
         
         # Geocoding
         geocoding = raw_config.get('geocoding', {})
@@ -60,10 +77,50 @@ class Config:
                 return lib
         return None
     
-    def get_user(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get user configuration by username."""
-        for user in self.users:
-            if user.get('username') == username:
-                return user
-        return None
+    def get_admin_user(self) -> Optional[Dict[str, Any]]:
+        """Get admin user from config."""
+        return self.admin_user if self.admin_user.get('username') else None
+    
+    def save_config(self, config_path: Optional[str] = None):
+        """Save configuration back to YAML file."""
+        if config_path is None:
+            config_path = os.getenv("PHOTOMEDIT_CONFIG", "config.yaml")
+        
+        config_dict = {
+            'server': {
+                'port': self.port,
+                'host': self.host,
+                'jwtSecret': self.jwt_secret
+            },
+            'auth': {
+                'enabled': self.auth_enabled,
+                'adminUser': self.admin_user
+            },
+            'libraries': self.libraries,
+            'thumbnailCacheRoot': self.thumbnail_cache_root,
+            'uploadRoot': self.upload_root,
+            'limits': {
+                'upload': {
+                    'maxFiles': self.max_upload_files,
+                    'maxBytesPerFile': self.max_upload_bytes_per_file,
+                    'maxBytesTotal': self.max_upload_bytes_total
+                },
+                'download': {
+                    'maxFiles': self.max_download_files,
+                    'maxBytes': self.max_download_bytes
+                }
+            },
+            'geocoding': {
+                'provider': self.geocoding_provider,
+                'enabled': self.geocoding_enabled,
+                'userAgent': self.geocoding_user_agent,
+                'rateLimit': self.geocoding_rate_limit
+            },
+            'logging': {
+                'level': self.log_level
+            }
+        }
+        
+        with open(config_path, 'w') as f:
+            yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
 

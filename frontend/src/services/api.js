@@ -42,18 +42,26 @@ api.interceptors.response.use(
 )
 
 // Auth API
-export const login = async (username, password) => {
-  const response = await api.post('/auth/login', { username, password })
+export const login = async (username, password, mfaToken = null) => {
+  const response = await api.post('/auth/login', { username, password, mfaToken })
   if (response.data.token) {
     setAuthToken(response.data.token)
   }
   return response.data
 }
 
+export const forgotPassword = (email) => api.post('/auth/forgot-password', { email })
+export const resetPassword = (token, password) => api.post('/auth/reset-password', { token, password })
+export const setupMFA = () => api.get('/auth/mfa/setup')
+export const verifyMFASetup = (token) => api.post('/auth/mfa/verify', { token })
+export const disableMFA = (password) => api.post('/auth/mfa/disable', { password })
+
 // Libraries API
 export const getLibraries = () => api.get('/libraries')
 export const getFolders = (libraryId, parent = '') => 
   api.get(`/libraries/${libraryId}/folders`, { params: { parent } })
+export const createFolder = (libraryId, parent, name) => 
+  api.post(`/libraries/${libraryId}/folders`, { parent, name })
 export const getMedia = (libraryId, folderId, reviewStatus = 'unreviewed') =>
   api.get(`/libraries/${libraryId}/folders/${folderId}/media`, { params: { reviewStatus } })
 
@@ -77,14 +85,33 @@ export const getThumbnailUrl = (mediaId) => getImageUrl(mediaId, 'thumbnail')
 // Search API
 export const search = (params) => api.get('/search', { params })
 
+// Admin API
+export const getUsers = () => api.get('/admin/users')
+export const createUser = (userData) => api.post('/admin/users', {
+  username: userData.username,
+  password: userData.password,
+  role: userData.role || (userData.isAdmin ? 'admin' : 'user')
+})
+export const updateUser = (username, userData) => api.put(`/admin/users/${username}`, {
+  password: userData.password || undefined,
+  role: userData.role || (userData.isAdmin ? 'admin' : 'user')
+})
+export const deleteUser = (username) => api.delete(`/admin/users/${username}`)
+
 // Upload API
-export const uploadFiles = (libraryId, files, targetFolder, batchName) => {
+export const uploadFiles = (uploadName, files) => {
   const formData = new FormData()
   files.forEach(file => formData.append('files', file))
-  formData.append('targetFolder', targetFolder)
-  if (batchName) formData.append('batchName', batchName)
-  return api.post(`/libraries/${libraryId}/upload`, formData, {
+  formData.append('uploadName', uploadName)
+  return api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+// Download API
+export const downloadMedia = (libraryId, scope, folder = '') => {
+  return api.post('/download', { libraryId, scope, folder }, {
+    responseType: 'blob'
   })
 }
 

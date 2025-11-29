@@ -1,0 +1,28 @@
+.pm-folder-creator-dialog {
+  position: relative;
+}
+
+.pm-folder-creator-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+}
+
+.pm-folder-creator-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--pm-surface);
+  border: 1px solid var(--pm-border-soft);
+  border-radius: var(--pm-radius-lg);
+  padding: 2rem;
+  min-width: 400px;
+  z-index: 1001;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+

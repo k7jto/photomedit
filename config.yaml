@@ -9,11 +9,13 @@ server:
 # Authentication
 auth:
   enabled: true
-  users:
-    - username: "admin"
-      passwordHash: "$2b$12$1aCOPTBsVc.cjOJnQqhcuue84mGVEu1JKS4VrMXasJwjhmZM8eK5G"  # password: admin
-    - username: "user"
-      passwordHash: "$2b$12$8RkLdssZ9eC385zWSQL10OJ2QSnMK9fpJLdFGayzFOKjXM8HCxwHu"  # password: user
+  # Admin user kept in config for initial access
+  # Other users are stored in MariaDB database
+  adminUser:
+    username: "admin"
+    email: "admin@domain.com"  # Admin email for password resets and notifications
+    passwordHash: "$2b$12$1aCOPTBsVc.cjOJnQqhcuue84mGVEu1JKS4VrMXasJwjhmZM8eK5G"  # password: admin
+    isAdmin: true
 
 # Libraries (NAS directories)
 libraries:
@@ -23,6 +25,19 @@ libraries:
 
 # Thumbnail cache
 thumbnailCacheRoot: "/data/thumbnails"
+
+# Upload root (where new upload batches are stored)
+uploadRoot: "/data/uploads"
+
+# Upload/Download limits
+limits:
+  upload:
+    maxFiles: 500
+    maxBytesPerFile: 524288000  # 500 MB
+    maxBytesTotal: 10737418240  # 10 GB
+  download:
+    maxFiles: 10000
+    maxBytes: 21474836480  # 20 GB
 
 # Geocoding
 geocoding:

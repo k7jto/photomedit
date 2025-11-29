@@ -13,4 +13,9 @@ requests==2.31.0
 Werkzeug==3.0.1
 pytest==7.4.3
 pytest-cov==4.1.0
+pyotp==2.9.0
+qrcode[pil]==7.4.2
+SQLAlchemy==2.0.23
+pymysql==1.1.0
+cryptography==41.0.7
 

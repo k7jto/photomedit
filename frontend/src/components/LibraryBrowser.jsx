@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useParams } from 'react-router-dom'
 import { getLibraries, getFolders } from '../services/api'
 import Logo from './Logo'
+import FolderCreator from './FolderCreator'
 
 function LibraryBrowser() {
   const [libraries, setLibraries] = useState([])
@@ -61,7 +62,29 @@ function LibraryBrowser() {
           <Logo size="medium" showTagline={false} />
         </div>
         <div className="pm-header-right">
-          {/* Future: User menu or other header actions */}
+          <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+            <button 
+              className="pm-button pm-button-ghost"
+              onClick={() => navigate('/upload')}
+              style={{fontSize: '0.875rem'}}
+            >
+              Upload
+            </button>
+            <button 
+              className="pm-button pm-button-ghost"
+              onClick={() => navigate('/mfa-setup')}
+              style={{fontSize: '0.875rem'}}
+            >
+              MFA Setup
+            </button>
+            <button 
+              className="pm-button pm-button-ghost"
+              onClick={() => navigate('/admin')}
+              style={{fontSize: '0.875rem'}}
+            >
+              Admin
+            </button>
+          </div>
         </div>
       </header>
       <div className="pm-main">
@@ -82,7 +105,16 @@ function LibraryBrowser() {
           
           {selectedLibrary && (
             <div className="pm-panel">
-              <div className="pm-panel-title">Folders</div>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem'}}>
+                <div className="pm-panel-title">Folders</div>
+                <FolderCreator 
+                  libraryId={selectedLibrary} 
+                  currentFolder={selectedFolder}
+                  onFolderCreated={() => {
+                    loadFolders(selectedLibrary, selectedFolder || '')
+                  }}
+                />
+              </div>
               <ul className="pm-tree">
                 <li className="pm-tree-item">
                   <button

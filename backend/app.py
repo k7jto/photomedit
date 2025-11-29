@@ -6,11 +6,14 @@ from flask_cors import CORS
 from backend.config.loader import Config
 from backend.security.headers import apply_security_headers
 from backend.auth.jwt import JWTManager
+from backend.database.connection import init_db
 from backend.auth.routes import auth_bp
 from backend.libraries.routes import libraries_bp
 from backend.media.routes import media_bp
 from backend.search.routes import search_bp
 from backend.upload.routes import upload_bp
+from backend.download.routes import download_bp
+from backend.admin.routes import admin_bp
 
 
 def create_app(config_path: str = None):
@@ -37,6 +40,23 @@ def create_app(config_path: str = None):
     # Apply security headers
     apply_security_headers(app)
     
+    # Initialize database (with retry logic)
+    max_retries = 5
+    retry_delay = 2
+    for attempt in range(max_retries):
+        try:
+            init_db()
+            app.logger.info("Database initialized")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                app.logger.warning(f"Database initialization attempt {attempt + 1} failed, retrying in {retry_delay}s: {e}")
+                import time
+                time.sleep(retry_delay)
+            else:
+                app.logger.error(f"Failed to initialize database after {max_retries} attempts: {e}")
+                # Continue anyway - database might not be available yet
+    
     # JWT manager
     jwt_manager = JWTManager(config.jwt_secret)
     app.config['JWT_MANAGER'] = jwt_manager
@@ -45,8 +65,9 @@ def create_app(config_path: str = None):
     @app.before_request
     def check_auth():
         """Check JWT authentication for protected routes."""
-        # Skip auth check for login and static files
-        if request.endpoint in ['auth.login', 'static', 'serve_frontend']:
+        # Skip auth check for login, password reset, and static files
+        skip_endpoints = ['auth.login', 'auth.forgot_password', 'auth.reset_password', 'static', 'serve_frontend']
+        if request.endpoint in skip_endpoints or '/forgot-password' in request.path or '/reset-password' in request.path:
             return
         
         if not config.auth_enabled:
@@ -92,12 +113,32 @@ def create_app(config_path: str = None):
         # Store username in request context
         request.current_user = payload.get('username')
     
+    # Close database session after request
+    @app.teardown_appcontext
+    def close_db(error):
+        from backend.database.models import get_session_local
+        try:
+            get_session_local().remove()
+        except Exception:
+            pass
+    
+    # Close database session after request
+    @app.teardown_appcontext
+    def close_db(error):
+        from backend.database.models import get_session_local
+        try:
+            get_session_local().remove()
+        except Exception:
+            pass
+    
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(libraries_bp, url_prefix='/api')
     app.register_blueprint(media_bp, url_prefix='/api')
     app.register_blueprint(search_bp, url_prefix='/api')
     app.register_blueprint(upload_bp, url_prefix='/api')
+    app.register_blueprint(download_bp, url_prefix='/api')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
     
     # Serve frontend
     @app.route('/', defaults={'path': ''})

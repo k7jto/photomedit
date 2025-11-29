@@ -1,0 +1,52 @@
+.pm-admin {
+  padding: 2rem;
+}
+
+.pm-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.pm-form-card {
+  background: var(--pm-surface);
+  border: 1px solid var(--pm-border-soft);
+  border-radius: var(--pm-radius-md);
+  padding: 1.5rem;
+}
+
+.pm-table {
+  background: var(--pm-surface);
+  border: 1px solid var(--pm-border-soft);
+  border-radius: var(--pm-radius-md);
+  overflow: hidden;
+}
+
+.pm-table table {
+  border-collapse: collapse;
+}
+
+.pm-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1px solid var(--pm-border-soft);
+  font-weight: 600;
+  color: var(--pm-text);
+}
+
+.pm-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--pm-border-soft);
+  color: var(--pm-text-muted);
+}
+
+.pm-table tr:last-child td {
+  border-bottom: none;
+}
+
+.pm-table tr:hover {
+  background: rgba(15, 23, 42, 0.3);
+}
+

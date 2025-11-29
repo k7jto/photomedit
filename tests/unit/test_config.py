@@ -14,7 +14,11 @@ server:
 
 auth:
   enabled: true
-  users: []
+  adminUser:
+    username: "admin"
+    email: "admin@test.com"
+    passwordHash: "$2b$12$test"
+    isAdmin: true
 
 libraries:
   - id: "lib1"
@@ -22,6 +26,14 @@ libraries:
     rootPath: "/tmp/test"
 
 thumbnailCacheRoot: "/tmp/thumbnails"
+uploadRoot: "/tmp/uploads"
+
+limits:
+  maxUploadFiles: 500
+  maxUploadBytesPerFile: 524288000
+  maxUploadBytesTotal: 10737418240
+  maxDownloadFiles: 10000
+  maxDownloadBytes: 21474836480
 
 logging:
   level: "INFO"
@@ -38,6 +50,9 @@ logging:
         assert len(config.libraries) == 1
         assert config.get_library("lib1") is not None
         assert config.get_library("nonexistent") is None
+        assert config.get_admin_user() is not None
+        assert config.get_admin_user().get('username') == 'admin'
+        assert config.get_admin_user().get('email') == 'admin@test.com'
     finally:
         os.unlink(config_path)
 
@@ -59,3 +74,50 @@ server:
     finally:
         os.unlink(config_path)
 
+
+def test_config_admin_user():
+    """Test admin user configuration."""
+    config_content = """
+server:
+  port: 4750
+  jwtSecret: "test"
+
+auth:
+  enabled: true
+  adminUser:
+    username: "admin"
+    email: "admin@test.com"
+    passwordHash: "$2b$12$test"
+    isAdmin: true
+
+libraries:
+  - id: "lib1"
+    name: "Library 1"
+    rootPath: "/tmp/test"
+
+thumbnailCacheRoot: "/tmp/thumbnails"
+uploadRoot: "/tmp/uploads"
+
+limits:
+  maxUploadFiles: 500
+  maxUploadBytesPerFile: 524288000
+  maxUploadBytesTotal: 10737418240
+  maxDownloadFiles: 10000
+  maxDownloadBytes: 21474836480
+
+logging:
+  level: "INFO"
+"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write(config_content)
+        config_path = f.name
+    
+    try:
+        config = Config(config_path)
+        admin_user = config.get_admin_user()
+        assert admin_user is not None
+        assert admin_user.get('username') == 'admin'
+        assert admin_user.get('email') == 'admin@test.com'
+        assert admin_user.get('isAdmin') is True
+    finally:
+        os.unlink(config_path)

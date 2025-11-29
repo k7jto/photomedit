@@ -1,144 +1,279 @@
-"""Upload routes."""
+"""Upload routes per upload-download.md specification."""
 from flask import Blueprint, request, jsonify, current_app
 from backend.config.loader import Config
 from backend.security.sanitizer import PathSanitizer
+from backend.media.metadata_reader import MetadataReader
 import os
+import re
 import magic
-from werkzeug.utils import secure_filename
+import tempfile
+import shutil
+from datetime import datetime
+from pathlib import Path
+import logging
 
+logger = logging.getLogger(__name__)
 
 upload_bp = Blueprint('upload', __name__)
 
-# Allowed MIME types
-ALLOWED_IMAGE_TYPES = {
-    'image/jpeg', 'image/jpg', 'image/tiff', 'image/x-tiff',
-    'image/x-canon-cr2', 'image/x-canon-cr3', 'image/x-olympus-orf',
-    'image/x-nikon-nef', 'image/x-fuji-raf', 'image/x-sony-arw',
-    'image/x-adobe-dng'
-}
 
-ALLOWED_VIDEO_TYPES = {
-    'video/mp4', 'video/quicktime', 'video/x-m4v', 'video/x-msvideo'
-}
+def sanitize_upload_name(name: str) -> str:
+    """Sanitize upload name for directory creation."""
+    # Lowercase
+    sanitized = name.lower()
+    # Replace spaces with hyphens
+    sanitized = sanitized.replace(' ', '-')
+    # Remove unsafe characters (keep alphanumeric, hyphens, underscores)
+    sanitized = re.sub(r'[^a-z0-9_-]', '', sanitized)
+    # Remove leading/trailing hyphens and underscores
+    sanitized = sanitized.strip('-_')
+    # Limit length
+    if len(sanitized) > 100:
+        sanitized = sanitized[:100]
+    # Ensure not empty
+    if not sanitized:
+        sanitized = 'upload'
+    return sanitized
 
-MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
 
-
-def validate_file_type(file_content: bytes) -> tuple:
-    """Validate file type using magic bytes."""
-    mime = magic.Magic(mime=True)
-    file_type = mime.from_buffer(file_content)
+def get_unique_filename(directory: str, filename: str) -> str:
+    """Get a unique filename, appending numeric suffix if needed."""
+    base_path = os.path.join(directory, filename)
+    if not os.path.exists(base_path):
+        return filename
     
-    if file_type in ALLOWED_IMAGE_TYPES:
+    # Split name and extension
+    name, ext = os.path.splitext(filename)
+    counter = 1
+    
+    while True:
+        new_filename = f"{name}-{counter}{ext}"
+        new_path = os.path.join(directory, new_filename)
+        if not os.path.exists(new_path):
+            return new_filename
+        counter += 1
+        if counter > 10000:  # Safety limit
+            raise ValueError("Too many filename conflicts")
+
+
+def validate_file_type_binary(file_content: bytes) -> tuple:
+    """Validate file type using magic bytes (binary signature)."""
+    if len(file_content) < 4:
+        return False, None
+    
+    # Use python-magic for binary detection
+    try:
+        mime = magic.Magic(mime=True)
+        file_type = mime.from_buffer(file_content[:8192])  # Peek at first 8KB
+    except Exception as e:
+        logger.error(f"Magic detection failed: {e}")
+        return False, None
+    
+    # Allowed image types
+    image_types = {
+        'image/jpeg', 'image/jpg', 'image/tiff', 'image/x-tiff',
+        'image/x-canon-cr2', 'image/x-canon-cr3', 'image/x-olympus-orf',
+        'image/x-nikon-nef', 'image/x-fuji-raf', 'image/x-sony-arw',
+        'image/x-adobe-dng', 'image/x-panasonic-rw2'
+    }
+    
+    # Allowed video types
+    video_types = {
+        'video/mp4', 'video/quicktime', 'video/x-m4v'
+    }
+    
+    if file_type in image_types:
         return True, 'image'
-    elif file_type in ALLOWED_VIDEO_TYPES:
+    elif file_type in video_types:
         return True, 'video'
     else:
         return False, None
 
 
-@upload_bp.route('/libraries/<library_id>/upload', methods=['POST'])
-def upload_files(library_id: str):
-    """Upload media files to a library."""
+@upload_bp.route('/upload', methods=['POST'])
+def upload_files():
+    """Upload media files to uploadRoot with batch naming."""
     config = current_app.config.get('PHOTOMEDIT_CONFIG')
     if not config:
         return jsonify({'error': 'internal_error', 'message': 'Configuration not available'}), 500
     
-    library = config.get_library(library_id)
-    if not library:
-        return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
-    
     # Get form data
-    target_folder = request.form.get('targetFolder', '')
-    batch_name = request.form.get('batchName', '')
+    upload_name = request.form.get('uploadName', '').strip()
+    if not upload_name:
+        return jsonify({'error': 'validation_error', 'message': 'uploadName is required'}), 400
     
-    # Validate target folder path
-    is_valid, resolved_folder, error = PathSanitizer.sanitize_path(library['rootPath'], target_folder)
-    if not is_valid:
-        return jsonify({'error': 'validation_error', 'message': error}), 400
+    if len(upload_name) > 100:
+        return jsonify({'error': 'validation_error', 'message': 'uploadName too long (max 100 characters)'}), 400
     
-    # Ensure target folder exists
-    os.makedirs(resolved_folder, exist_ok=True)
-    
-    # Process uploaded files
-    uploaded = []
-    errors = []
-    
+    # Get files
     if 'files' not in request.files:
         return jsonify({'error': 'validation_error', 'message': 'No files provided'}), 400
     
     files = request.files.getlist('files')
+    if not files or len(files) == 0:
+        return jsonify({'error': 'validation_error', 'message': 'No files provided'}), 400
+    
+    # Check file count limit
+    if len(files) > config.max_upload_files:
+        return jsonify({
+            'error': 'validation_error',
+            'message': f'Too many files (max {config.max_upload_files})'
+        }), 400
+    
+    # Sanitize upload name and create batch directory
+    sanitized_name = sanitize_upload_name(upload_name)
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    batch_dir_name = f"{sanitized_name}-{timestamp}"
+    batch_path = os.path.join(config.upload_root, batch_dir_name)
+    
+    try:
+        os.makedirs(batch_path, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Failed to create batch directory: {e}")
+        return jsonify({'error': 'internal_error', 'message': 'Failed to create upload directory'}), 500
+    
+    # Process files
+    uploaded_files = []
+    total_size = 0
+    errors = []
     
     for file in files:
         if not file.filename:
             continue
         
-        # Check file size
+        original_name = file.filename
+        
+        # Read file content for validation
         file.seek(0, os.SEEK_END)
         file_size = file.tell()
         file.seek(0)
         
-        if file_size > MAX_FILE_SIZE:
+        # Check per-file size limit
+        if file_size > config.max_upload_bytes_per_file:
             errors.append({
-                'filename': file.filename,
-                'error': 'File size exceeds maximum (500MB)'
+                'originalName': original_name,
+                'status': 'error',
+                'errorCode': 'FILE_TOO_LARGE',
+                'errorMessage': f'File exceeds maximum size ({config.max_upload_bytes_per_file / (1024*1024):.0f} MB)'
             })
             continue
         
-        # Read file content for validation
-        file_content = file.read()
+        # Check total size limit
+        if total_size + file_size > config.max_upload_bytes_total:
+            errors.append({
+                'originalName': original_name,
+                'status': 'error',
+                'errorCode': 'TOTAL_SIZE_EXCEEDED',
+                'errorMessage': 'Total upload size would exceed limit'
+            })
+            continue
+        
+        # Read first 8KB for binary validation
+        peek_content = file.read(8192)
         file.seek(0)
         
         # Validate file type
-        is_valid_type, media_type = validate_file_type(file_content)
-        if not is_valid_type:
+        is_valid, media_type = validate_file_type_binary(peek_content)
+        if not is_valid:
             errors.append({
-                'filename': file.filename,
-                'error': 'File type not supported'
+                'originalName': original_name,
+                'status': 'error',
+                'errorCode': 'UNSUPPORTED_TYPE',
+                'errorMessage': 'File type not supported (must be image or video)'
             })
             continue
         
         # Sanitize filename
-        sanitized_filename = PathSanitizer.sanitize_filename(file.filename)
+        sanitized_filename = PathSanitizer.sanitize_filename(original_name)
         if not sanitized_filename:
             errors.append({
-                'filename': file.filename,
-                'error': 'Invalid filename'
+                'originalName': original_name,
+                'status': 'error',
+                'errorCode': 'INVALID_FILENAME',
+                'errorMessage': 'Invalid filename'
             })
             continue
         
-        # Determine target path
-        target_path = os.path.join(resolved_folder, sanitized_filename)
-        
-        # Check if file already exists
-        if os.path.exists(target_path):
-            errors.append({
-                'filename': file.filename,
-                'error': 'File already exists'
-            })
-            continue
-        
-        # Save file
+        # Get unique filename
         try:
-            file.save(target_path)
-            
-            # Get relative path
-            relative_path = os.path.relpath(target_path, library['rootPath']).replace(os.sep, '/')
-            media_id = f"{library_id}|{relative_path}"
-            
-            uploaded.append({
-                'filename': sanitized_filename,
-                'relativePath': relative_path,
-                'mediaId': media_id
-            })
+            unique_filename = get_unique_filename(batch_path, sanitized_filename)
         except Exception as e:
             errors.append({
-                'filename': file.filename,
-                'error': f'Failed to save file: {str(e)}'
+                'originalName': original_name,
+                'status': 'error',
+                'errorCode': 'FILENAME_CONFLICT',
+                'errorMessage': f'Failed to resolve filename conflict: {str(e)}'
+            })
+            continue
+        
+        # Atomic write: write to temp file, then rename
+        temp_filename = f"{unique_filename}.tmp"
+        temp_path = os.path.join(batch_path, temp_filename)
+        final_path = os.path.join(batch_path, unique_filename)
+        
+        try:
+            # Write to temp file
+            with open(temp_path, 'wb') as f:
+                shutil.copyfileobj(file, f)
+            
+            # Verify file was written correctly
+            if os.path.getsize(temp_path) != file_size:
+                os.remove(temp_path)
+                errors.append({
+                    'originalName': original_name,
+                    'status': 'error',
+                    'errorCode': 'WRITE_FAILED',
+                    'errorMessage': 'File size mismatch after write'
+                })
+                continue
+            
+            # Atomically rename
+            os.rename(temp_path, final_path)
+            
+            # Post-upload: import metadata
+            try:
+                # Read metadata (this will discover sidecar if present)
+                logical_metadata = MetadataReader.read_logical_metadata(final_path)
+                # Metadata is now available for the UI
+            except Exception as e:
+                logger.warning(f"Failed to import metadata for {final_path}: {e}")
+                # Continue anyway - file is uploaded successfully
+            
+            # Calculate relative path from uploadRoot
+            relative_path = os.path.relpath(final_path, config.upload_root).replace(os.sep, '/')
+            
+            uploaded_files.append({
+                'originalName': original_name,
+                'storedName': unique_filename,
+                'relativePath': relative_path,
+                'sizeBytes': file_size,
+                'status': 'ok'
+            })
+            
+            total_size += file_size
+            
+        except Exception as e:
+            # Clean up temp file if it exists
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+            
+            logger.error(f"Failed to save file {original_name}: {e}")
+            errors.append({
+                'originalName': original_name,
+                'status': 'error',
+                'errorCode': 'WRITE_FAILED',
+                'errorMessage': f'Failed to save file: {str(e)}'
             })
     
-    return jsonify({
-        'uploaded': uploaded,
-        'errors': errors
-    }), 200
-
+    # Build response
+    response = {
+        'uploadId': batch_dir_name,
+        'uploadName': upload_name,
+        'targetDirectory': batch_dir_name,
+        'files': uploaded_files + errors
+    }
+    
+    return jsonify(response), 200

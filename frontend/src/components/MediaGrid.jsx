@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getMedia, getThumbnailUrl } from '../services/api'
+import { getMedia, getThumbnailUrl, downloadMedia } from '../services/api'
 
 function MediaGrid() {
   const [media, setMedia] = useState([])
@@ -36,6 +36,28 @@ function MediaGrid() {
     return <div>Loading...</div>
   }
 
+  const handleDownload = async (scope) => {
+    if (!libraryId) return
+    
+    try {
+      const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
+      const response = await downloadMedia(libraryId, scope, folder)
+      
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data], { type: 'application/zip' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `download-${scope}-${Date.now()}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err.response?.data?.message || 'Download failed')
+    }
+  }
+
   return (
     <div className="pm-content">
       <div className="pm-toolbar">
@@ -43,21 +65,21 @@ function MediaGrid() {
           <div className="pm-filter-group">
             <div className="pm-filter-label">Review Status</div>
             <div className="pm-pill-group">
-              <span 
+              <span
                 className={`pm-pill ${reviewStatus === 'unreviewed' ? 'pm-pill-active' : ''}`}
                 onClick={() => setReviewStatus('unreviewed')}
                 style={{cursor: 'pointer'}}
               >
                 Unreviewed
               </span>
-              <span 
+              <span
                 className={`pm-pill ${reviewStatus === 'reviewed' ? 'pm-pill-active' : ''}`}
                 onClick={() => setReviewStatus('reviewed')}
                 style={{cursor: 'pointer'}}
               >
                 Reviewed
               </span>
-              <span 
+              <span
                 className={`pm-pill ${reviewStatus === 'all' ? 'pm-pill-active' : ''}`}
                 onClick={() => setReviewStatus('all')}
                 style={{cursor: 'pointer'}}
@@ -66,6 +88,21 @@ function MediaGrid() {
               </span>
             </div>
           </div>
+        </div>
+        <div className="pm-toolbar-right">
+          <button
+            className="pm-button pm-button-ghost"
+            onClick={() => handleDownload('all')}
+            style={{marginRight: '0.5rem'}}
+          >
+            Download All
+          </button>
+          <button
+            className="pm-button pm-button-ghost"
+            onClick={() => handleDownload('reviewed')}
+          >
+            Download Reviewed
+          </button>
         </div>
       </div>
       
