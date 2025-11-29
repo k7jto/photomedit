@@ -48,7 +48,6 @@ class MetadataWriter:
                 cmd = ['exiftool', '-overwrite_original', '-P', '-m'] + args + [file_path]
             
             logger.debug(f"Running exiftool: {' '.join(cmd)}")
-            logger.info(f"Writing tags to {file_path}: {list(tags.keys())}")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -58,17 +57,10 @@ class MetadataWriter:
             
             if result.returncode != 0:
                 logger.error(f"Exiftool failed for {file_path}: {result.stderr}")
-                logger.error(f"Exiftool stdout: {result.stdout}")
-                logger.error(f"Exiftool command: {' '.join(cmd)}")
+                logger.debug(f"Exiftool stdout: {result.stdout}")
                 return False
             
             logger.info(f"Successfully wrote metadata to {file_path}")
-            # Verify the write by reading back
-            if 'XMP:UserComment' in tags:
-                from backend.media.metadata_reader import MetadataReader as MR
-                verify_exif = MR._run_exiftool(file_path, ['-XMP:UserComment'])
-                verify_comment = verify_exif.get('XMP:UserComment', '') if verify_exif else ''
-                logger.info(f"Verified UserComment after write: '{verify_comment}'")
             return True
         except subprocess.TimeoutExpired:
             logger.error(f"Exiftool timed out for {file_path}")

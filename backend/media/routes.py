@@ -208,12 +208,8 @@ def update_media(media_id: str):
     
     # Check if we should mark as reviewed when saving
     mark_reviewed = request.get_json().get('markReviewed', False) if request.get_json() else False
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"Update media {media_id}: markReviewed={mark_reviewed}, metadata keys={list(metadata.keys())}")
     if mark_reviewed:
         metadata['reviewStatus'] = 'reviewed'
-        logger.info(f"Setting reviewStatus to 'reviewed' for {media_id}")
     
     # Geocode location if locationName is provided and locationCoords is not
     if 'locationName' in metadata and 'locationCoords' not in metadata:

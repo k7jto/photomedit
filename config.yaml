@@ -48,5 +48,5 @@ geocoding:
 
 # Logging
 logging:
-  level: "DEBUG"  # DEBUG, INFO, WARNING, ERROR
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
 
