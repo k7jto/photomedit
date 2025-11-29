@@ -73,8 +73,8 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="library/:libraryId" element={<MediaGrid />} />
-          <Route path="library/:libraryId/folder/:folderId" element={<MediaGrid />} />
+          <Route path=":libraryId" element={<MediaGrid />} />
+          <Route path=":libraryId/folder/:folderId" element={<MediaGrid />} />
           <Route path="media/:mediaId" element={<MediaDetail />} />
         </Route>
         <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />

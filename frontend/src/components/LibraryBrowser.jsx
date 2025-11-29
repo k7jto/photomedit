@@ -27,7 +27,7 @@ function LibraryBrowser() {
       const response = await getLibraries()
       setLibraries(response.data)
       if (response.data.length > 0 && !params.libraryId) {
-        navigate(`/library/${response.data[0].id}`)
+        navigate(`/${response.data[0].id}`)
       }
     } catch (err) {
       console.error('Failed to load libraries:', err)
@@ -46,12 +46,12 @@ function LibraryBrowser() {
   }
 
   const handleLibrarySelect = (libraryId) => {
-    navigate(`/library/${libraryId}`)
+    navigate(`/${libraryId}`)
   }
 
   const handleFolderSelect = (folderId) => {
     const relativePath = folderId.includes('|') ? folderId.split('|')[1] : folderId
-    navigate(`/library/${selectedLibrary}/folder/${folderId}`)
+    navigate(`/${selectedLibrary}/folder/${folderId}`)
   }
 
   return (
@@ -109,9 +109,9 @@ function LibraryBrowser() {
                 <li className="pm-tree-item">
                   <button
                     className={`pm-tree-button ${!selectedFolder ? 'pm-tree-button-active' : ''}`}
-                    onClick={() => navigate(`/library/${selectedLibrary}`)}
+                    onClick={() => navigate(`/${selectedLibrary}`)}
                   >
-                    Root
+                    Home
                   </button>
                 </li>
                 {folders.map(folder => (
