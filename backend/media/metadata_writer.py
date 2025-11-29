@@ -202,14 +202,15 @@ class MetadataWriter:
         if 'reviewStatus' in metadata:
             review_value = str(metadata['reviewStatus']).lower()
             
-            # Read existing metadata to check if UserComment is being used for Notes
-            from backend.media.metadata_reader import MetadataReader
-            existing_metadata = MetadataReader.read_logical_metadata(file_path)
-            existing_notes = existing_metadata.get('notes', '') or ''
-            # Read UserComment directly from exif_data to avoid recursion
+            # Read existing UserComment directly from exif_data to avoid recursion
             from backend.media.metadata_reader import MetadataReader as MR
-            existing_exif = MR._run_exiftool(file_path, ['-XMP:UserComment'])
+            existing_exif = MR._run_exiftool(file_path, ['-XMP:UserComment', '-XMP:Description', '-IPTC:Caption-Abstract'])
             existing_user_comment = (existing_exif.get('XMP:UserComment', '') if existing_exif else '') or ''
+            existing_notes = (
+                (existing_exif.get('XMP:Description', '') if existing_exif else '') or
+                (existing_exif.get('IPTC:Caption-Abstract', '') if existing_exif else '') or
+                ''
+            )
             
             # Check if UserComment is different from Notes
             # If UserComment is the same as Notes, we shouldn't overwrite it
@@ -224,9 +225,9 @@ class MetadataWriter:
             # 1. It's empty, OR
             # 2. It's already PhotoMedit-prefixed, OR  
             # 3. It's different from Notes
-            if not notes_in_usercomment:
+            if not notes_in_usercomment or existing_user_comment.startswith('PhotoMedit:'):
                 tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
-            # If UserComment contains Notes, we skip writing review status to UserComment
+            # If UserComment contains Notes and is not PhotoMedit-prefixed, we skip writing review status
             # (in this case, review status won't be persisted - could use a different field)
         
         # Write to file
