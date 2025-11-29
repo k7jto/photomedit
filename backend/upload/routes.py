@@ -3,6 +3,8 @@ from flask import Blueprint, request, jsonify, current_app
 from backend.config.loader import Config
 from backend.security.sanitizer import PathSanitizer
 from backend.media.metadata_reader import MetadataReader
+from backend.database.log_service import LogService
+from flask import request as flask_request
 import os
 import re
 import magic
@@ -110,6 +112,15 @@ def upload_files():
         library = config.get_library(library_id)
         if not library:
             logger.error(f"Library not found: {library_id}")
+            user = getattr(flask_request, 'current_user', None)
+            LogService.log(
+                level='WARNING',
+                message=f"Upload failed: Library not found: {library_id}",
+                logger_name='upload',
+                user=user,
+                ip_address=flask_request.remote_addr,
+                details={'libraryId': library_id, 'uploadName': upload_name}
+            )
             return jsonify({'error': 'not_found', 'message': f'Library not found: {library_id}'}), 404
         
         if folder:
@@ -339,5 +350,25 @@ def upload_files():
             'targetDirectory': batch_dir_name,
             'files': uploaded_files + errors
         }
+    
+    # Log upload result
+    user = getattr(flask_request, 'current_user', None)
+    success_count = len(uploaded_files)
+    error_count = len(errors)
+    LogService.log(
+        level='INFO' if error_count == 0 else 'WARNING',
+        message=f"Upload completed: {success_count} successful, {error_count} failed",
+        logger_name='upload',
+        user=user,
+        ip_address=flask_request.remote_addr,
+        details={
+            'uploadName': upload_name,
+            'libraryId': library_id or None,
+            'folder': folder or None,
+            'successCount': success_count,
+            'errorCount': error_count,
+            'targetDirectory': response.get('targetDirectory')
+        }
+    )
     
     return jsonify(response), 200

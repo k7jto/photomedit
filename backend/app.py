@@ -7,6 +7,7 @@ from backend.config.loader import Config
 from backend.security.headers import apply_security_headers
 from backend.auth.jwt import JWTManager
 from backend.database.connection import init_db
+from backend.database.log_service import LogService
 from backend.auth.routes import auth_bp
 from backend.libraries.routes import libraries_bp
 from backend.media.routes import media_bp
@@ -150,13 +151,71 @@ def create_app(config_path: str = None):
         else:
             return send_from_directory(app.static_folder, 'index.html')
     
+    # Request logging middleware
+    @app.after_request
+    def log_request(response):
+        """Log all API requests to database."""
+        # Only log API endpoints (not static files)
+        if request.path.startswith('/api/'):
+            user = getattr(request, 'current_user', None)
+            level = 'ERROR' if response.status_code >= 400 else 'INFO'
+            message = f"{request.method} {request.path} - {response.status_code}"
+            
+            # Include error details for error responses
+            details = None
+            if response.status_code >= 400:
+                try:
+                    # Try to get error message from response
+                    if response.is_json:
+                        data = response.get_json()
+                        if data and 'message' in data:
+                            message += f": {data['message']}"
+                            details = {'error': data.get('error'), 'message': data.get('message')}
+                except:
+                    pass
+            
+            LogService.log(
+                level=level,
+                message=message,
+                logger_name='api.request',
+                user=user,
+                ip_address=request.remote_addr,
+                details=details
+            )
+        
+        return response
+    
     # Error handlers
     @app.errorhandler(404)
     def not_found(error):
+        user = getattr(request, 'current_user', None)
+        LogService.log(
+            level='WARNING',
+            message=f"404 Not Found: {request.method} {request.path}",
+            logger_name='api.error',
+            user=user,
+            ip_address=request.remote_addr,
+            details={'path': request.path, 'method': request.method}
+        )
         return jsonify({'error': 'not_found', 'message': 'Resource not found'}), 404
     
     @app.errorhandler(500)
     def internal_error(error):
+        user = getattr(request, 'current_user', None)
+        import traceback
+        error_details = {
+            'path': request.path,
+            'method': request.method,
+            'traceback': traceback.format_exc()
+        }
+        LogService.log(
+            level='ERROR',
+            message=f"500 Internal Server Error: {request.method} {request.path}",
+            logger_name='api.error',
+            user=user,
+            ip_address=request.remote_addr,
+            details=error_details
+        )
         return jsonify({'error': 'internal_error', 'message': 'Internal server error'}), 500
     
     return app
