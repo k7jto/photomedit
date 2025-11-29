@@ -48,6 +48,7 @@ def list_folders(library_id: str):
 
 
 @libraries_bp.route('/libraries/<library_id>/folders/<path:folder_id>/media', methods=['GET'])
+@libraries_bp.route('/libraries/<library_id>/folders/media', methods=['GET'], defaults={'folder_id': ''})
 def list_media(library_id: str, folder_id: str):
     """List media files in a folder."""
     config = current_app.config.get('PHOTOMEDIT_CONFIG')
@@ -58,8 +59,11 @@ def list_media(library_id: str, folder_id: str):
     if not library:
         return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
     
-    # Remove library ID prefix from folder_id
-    relative_path = folder_id.replace(f"{library_id}|", "", 1) if folder_id.startswith(f"{library_id}|") else folder_id
+    # Remove library ID prefix from folder_id, handle empty folder_id (root)
+    if not folder_id:
+        relative_path = ''
+    else:
+        relative_path = folder_id.replace(f"{library_id}|", "", 1) if folder_id.startswith(f"{library_id}|") else folder_id
     
     # Validate path
     is_valid, resolved_path, error = PathSanitizer.sanitize_path(library['rootPath'], relative_path)
