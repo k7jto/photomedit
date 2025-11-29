@@ -65,7 +65,8 @@ class MetadataWriter:
             logger.info(f"Successfully wrote metadata to {file_path}")
             # Verify the write by reading back
             if 'XMP:UserComment' in tags:
-                verify_exif = MetadataReader._run_exiftool(file_path, ['-XMP:UserComment'])
+                from backend.media.metadata_reader import MetadataReader as MR
+                verify_exif = MR._run_exiftool(file_path, ['-XMP:UserComment'])
                 verify_comment = verify_exif.get('XMP:UserComment', '') if verify_exif else ''
                 logger.info(f"Verified UserComment after write: '{verify_comment}'")
             return True
