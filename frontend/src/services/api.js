@@ -61,9 +61,11 @@ export const getLibraries = () => api.get('/libraries')
 export const getFolders = (libraryId, parent = '') => 
   api.get(`/libraries/${libraryId}/folders`, { params: { parent } })
 export const getMedia = (libraryId, folderId, reviewStatus = 'unreviewed') => {
-  // Handle empty folderId (root folder) - use empty string, not double slash
-  const folderPath = folderId || ''
-  return api.get(`/libraries/${libraryId}/folders/${folderPath}/media`, { params: { reviewStatus } })
+  // Handle empty folderId (root folder) - use special route without folder segment
+  if (!folderId || folderId === '') {
+    return api.get(`/libraries/${libraryId}/folders/media`, { params: { reviewStatus } })
+  }
+  return api.get(`/libraries/${libraryId}/folders/${folderId}/media`, { params: { reviewStatus } })
 }
 
 // Media API
