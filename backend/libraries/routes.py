@@ -47,54 +47,6 @@ def list_folders(library_id: str):
     return jsonify(folders), 200
 
 
-@libraries_bp.route('/libraries/<library_id>/folders', methods=['POST'])
-def create_folder(library_id: str):
-    """Create a new folder."""
-    config = current_app.config.get('PHOTOMEDIT_CONFIG')
-    if not config:
-        return jsonify({'error': 'internal_error', 'message': 'Configuration not available'}), 500
-    
-    library = config.get_library(library_id)
-    if not library:
-        return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'validation_error', 'message': 'Request body required'}), 400
-    
-    parent = data.get('parent', '')
-    folder_name = data.get('name', '').strip()
-    
-    if not folder_name:
-        return jsonify({'error': 'validation_error', 'message': 'Folder name required'}), 400
-    
-    # Validate folder name (no path separators)
-    if '/' in folder_name or '\\' in folder_name:
-        return jsonify({'error': 'validation_error', 'message': 'Invalid folder name'}), 400
-    
-    # Resolve parent path
-    is_valid, parent_path, error = PathSanitizer.sanitize_path(library['rootPath'], parent)
-    if not is_valid:
-        return jsonify({'error': 'validation_error', 'message': error}), 400
-    
-    # Create new folder
-    new_folder_path = os.path.join(parent_path, folder_name)
-    
-    try:
-        os.makedirs(new_folder_path, exist_ok=True)
-        
-        # Return folder info
-        folder_relative = os.path.relpath(new_folder_path, library['rootPath'])
-        return jsonify({
-            'id': f"{library_id}|{folder_relative.replace(os.sep, '/')}",
-            'name': folder_name,
-            'relativePath': folder_relative.replace(os.sep, '/'),
-            'hasChildren': False
-        }), 201
-    except Exception as e:
-        return jsonify({'error': 'internal_error', 'message': f'Failed to create folder: {str(e)}'}), 500
-
-
 @libraries_bp.route('/libraries/<library_id>/folders/<path:folder_id>/media', methods=['GET'])
 def list_media(library_id: str, folder_id: str):
     """List media files in a folder."""

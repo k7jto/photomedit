@@ -103,30 +103,44 @@ def upload_files():
     folder = request.form.get('folder', '').strip()
     
     # Determine target directory
-    if library_id and folder:
-        # Upload directly to library folder
+    if library_id:
+        # Uploading to a library
         library = config.get_library(library_id)
         if not library:
             return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
         
-        # Validate and sanitize folder path
-        is_valid, resolved_path, error = PathSanitizer.sanitize_path(library['rootPath'], folder)
-        if not is_valid:
-            return jsonify({'error': 'validation_error', 'message': error}), 400
-        
-        # Ensure target directory exists
-        try:
-            os.makedirs(resolved_path, exist_ok=True)
-        except Exception as e:
-            logger.error(f"Failed to create target directory: {e}")
-            return jsonify({'error': 'internal_error', 'message': 'Failed to create target directory'}), 500
-        
-        batch_path = resolved_path
-        target_root = library['rootPath']
+        if folder:
+            # Upload directly to specified library folder
+            is_valid, resolved_path, error = PathSanitizer.sanitize_path(library['rootPath'], folder)
+            if not is_valid:
+                return jsonify({'error': 'validation_error', 'message': error}), 400
+            
+            batch_path = resolved_path
+            target_root = library['rootPath']
+        else:
+            # Uploading to library root - create folder from upload name
+            if not upload_name:
+                return jsonify({'error': 'validation_error', 'message': 'Upload name is required to create a folder in the library root'}), 400
+            
+            if len(upload_name) > 100:
+                return jsonify({'error': 'validation_error', 'message': 'uploadName too long (max 100 characters)'}), 400
+            
+            # Sanitize upload name and create folder in library root
+            sanitized_name = sanitize_upload_name(upload_name)
+            new_folder_path = os.path.join(library['rootPath'], sanitized_name)
+            
+            try:
+                os.makedirs(new_folder_path, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Failed to create folder in library root: {e}")
+                return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
+            
+            batch_path = new_folder_path
+            target_root = library['rootPath']
     else:
-        # Default: upload to uploadRoot with batch naming
+        # Default: upload to uploadRoot with batch naming (standalone upload page)
         if not upload_name:
-            return jsonify({'error': 'validation_error', 'message': 'uploadName is required when not uploading to a folder'}), 400
+            return jsonify({'error': 'validation_error', 'message': 'uploadName is required'}), 400
         
         if len(upload_name) > 100:
             return jsonify({'error': 'validation_error', 'message': 'uploadName too long (max 100 characters)'}), 400
@@ -296,14 +310,25 @@ def upload_files():
             })
     
     # Build response
-    if library_id and folder:
-        response = {
-            'uploadId': f"{library_id}|{folder}",
-            'uploadName': upload_name or 'Direct upload',
-            'targetDirectory': folder,
-            'libraryId': library_id,
-            'files': uploaded_files + errors
-        }
+    if library_id:
+        if folder:
+            response = {
+                'uploadId': f"{library_id}|{folder}",
+                'uploadName': upload_name or 'Direct upload',
+                'targetDirectory': folder,
+                'libraryId': library_id,
+                'files': uploaded_files + errors
+            }
+        else:
+            # Created new folder in library root
+            folder_name = sanitize_upload_name(upload_name)
+            response = {
+                'uploadId': f"{library_id}|{folder_name}",
+                'uploadName': upload_name,
+                'targetDirectory': folder_name,
+                'libraryId': library_id,
+                'files': uploaded_files + errors
+            }
     else:
         response = {
             'uploadId': batch_dir_name,

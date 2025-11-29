@@ -60,8 +60,6 @@ export const disableMFA = (password) => api.post('/auth/mfa/disable', { password
 export const getLibraries = () => api.get('/libraries')
 export const getFolders = (libraryId, parent = '') => 
   api.get(`/libraries/${libraryId}/folders`, { params: { parent } })
-export const createFolder = (libraryId, parent, name) => 
-  api.post(`/libraries/${libraryId}/folders`, { parent, name })
 export const getMedia = (libraryId, folderId, reviewStatus = 'unreviewed') =>
   api.get(`/libraries/${libraryId}/folders/${folderId}/media`, { params: { reviewStatus } })
 

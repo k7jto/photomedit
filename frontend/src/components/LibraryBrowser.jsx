@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useParams } from 'react-router-dom'
 import { getLibraries, getFolders } from '../services/api'
 import Logo from './Logo'
-import FolderCreator from './FolderCreator'
 
 function LibraryBrowser() {
   const [libraries, setLibraries] = useState([])
@@ -105,16 +104,7 @@ function LibraryBrowser() {
           
           {selectedLibrary && (
             <div className="pm-panel">
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem'}}>
-                <div className="pm-panel-title">Folders</div>
-                <FolderCreator 
-                  libraryId={selectedLibrary} 
-                  currentFolder={selectedFolder}
-                  onFolderCreated={() => {
-                    loadFolders(selectedLibrary, selectedFolder || '')
-                  }}
-                />
-              </div>
+              <div className="pm-panel-title">Folders</div>
               <ul className="pm-tree">
                 <li className="pm-tree-item">
                   <button

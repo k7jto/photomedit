@@ -75,16 +75,28 @@ function MediaGrid() {
       return
     }
     
+    // If uploading to root, require upload name to create folder
+    if (!folderId && !uploadName.trim()) {
+      alert('Please enter a folder name to create a new folder in the library root')
+      return
+    }
+    
     setUploading(true)
     
     try {
-      // Upload directly to current folder
+      // Upload directly to current folder, or create new folder in root
       const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
-      await uploadFiles(uploadName || 'Upload', selectedFiles, libraryId, folder)
+      await uploadFiles(uploadName, selectedFiles, libraryId, folder)
       setShowUpload(false)
       setUploadName('')
       setSelectedFiles([])
-      loadMedia() // Reload media after upload
+      // Reload folders and media after upload
+      if (!folderId) {
+        // If we created a new folder, reload the folder list
+        window.location.reload() // Simple way to refresh everything
+      } else {
+        loadMedia() // Reload media after upload
+      }
       alert('Upload successful! Files are now in this folder.')
     } catch (err) {
       alert(err.response?.data?.message || 'Upload failed')
@@ -152,23 +164,25 @@ function MediaGrid() {
         <div className="pm-form-card" style={{marginBottom: '1.5rem', padding: '1.5rem'}}>
           <h3 style={{marginTop: 0}}>Upload to Current Location</h3>
           <p style={{color: 'var(--pm-text-muted)', fontSize: '0.875rem', marginBottom: '1rem'}}>
-            Files will be uploaded directly to this folder.
+            {folderId ? 'Files will be uploaded directly to this folder.' : 'Enter a name to create a new folder, or leave empty to upload to root.'}
           </p>
           <form onSubmit={handleUpload}>
-            <div className="pm-field" style={{marginBottom: '1rem'}}>
-              <div className="pm-field-label">Upload Name (optional)</div>
-              <input
-                className="pm-input"
-                type="text"
-                value={uploadName}
-                onChange={(e) => setUploadName(e.target.value)}
-                placeholder="Optional: name for this upload"
-                maxLength={100}
-              />
-              <div style={{fontSize: '0.75rem', color: 'var(--pm-text-muted)', marginTop: '0.25rem'}}>
-                Leave empty to upload files directly to this folder
+            {!folderId && (
+              <div className="pm-field" style={{marginBottom: '1rem'}}>
+                <div className="pm-field-label">Folder Name</div>
+                <input
+                  className="pm-input"
+                  type="text"
+                  value={uploadName}
+                  onChange={(e) => setUploadName(e.target.value)}
+                  placeholder="Enter name to create a new folder"
+                  maxLength={100}
+                />
+                <div style={{fontSize: '0.75rem', color: 'var(--pm-text-muted)', marginTop: '0.25rem'}}>
+                  A new folder will be created with this name in the library root
+                </div>
               </div>
-            </div>
+            )}
             <div className="pm-field" style={{marginBottom: '1rem'}}>
               <div className="pm-field-label">Select Files</div>
               <input
@@ -209,7 +223,7 @@ function MediaGrid() {
               <button
                 type="submit"
                 className="pm-button pm-button-primary"
-                disabled={uploading || selectedFiles.length === 0}
+                disabled={uploading || selectedFiles.length === 0 || (!folderId && !uploadName.trim())}
               >
                 {uploading ? 'Uploading...' : 'Upload Files'}
               </button>
