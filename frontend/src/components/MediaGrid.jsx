@@ -96,13 +96,8 @@ function MediaGrid() {
       setShowUpload(false)
       setUploadName('')
       setSelectedFiles([])
-      // Reload folders and media after upload
-      if (!folderId) {
-        // If we created a new folder, reload the folder list
-        window.location.reload() // Simple way to refresh everything
-      } else {
-        loadMedia() // Reload media after upload
-      }
+      // Reload media after upload
+      loadMedia()
       alert('Upload successful! Files are now in this folder.')
     } catch (err) {
       alert(err.response?.data?.message || 'Upload failed')
