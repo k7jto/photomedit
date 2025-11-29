@@ -4,6 +4,7 @@ from backend.config.loader import Config
 from backend.security.sanitizer import PathSanitizer
 from backend.media.metadata_reader import MetadataReader
 from backend.database.log_service import LogService
+from backend.utils.file_io import create_directory_with_permissions
 from flask import request as flask_request
 import os
 import re
@@ -144,7 +145,9 @@ def upload_files():
             new_folder_path = os.path.join(library['rootPath'], sanitized_name)
             
             try:
-                os.makedirs(new_folder_path, exist_ok=True)
+                if not create_directory_with_permissions(new_folder_path):
+                    logger.error(f"Failed to create folder in library root: {new_folder_path}")
+                    return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
             except Exception as e:
                 logger.error(f"Failed to create folder in library root: {e}")
                 return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
@@ -167,7 +170,9 @@ def upload_files():
         target_root = config.upload_root
         
         try:
-            os.makedirs(batch_path, exist_ok=True)
+            if not create_directory_with_permissions(batch_path):
+                logger.error(f"Failed to create batch directory: {batch_path}")
+                return jsonify({'error': 'internal_error', 'message': 'Failed to create upload directory'}), 500
         except Exception as e:
             logger.error(f"Failed to create batch directory: {e}")
             return jsonify({'error': 'internal_error', 'message': 'Failed to create upload directory'}), 500
