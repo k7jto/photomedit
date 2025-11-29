@@ -1,0 +1,52 @@
+# PhotoMedit Configuration
+
+# Server settings
+server:
+  port: 4750
+  host: "0.0.0.0"
+  jwtSecret: "change-me-in-production-use-strong-random-secret"
+
+# Authentication
+auth:
+  enabled: true
+  # Admin user kept in config for initial access
+  # Other users are stored in MariaDB database
+  adminUser:
+    username: "admin"
+    email: "admin@domain.com"  # Admin email for password resets and notifications
+    passwordHash: "$2b$12$1aCOPTBsVc.cjOJnQqhcuue84mGVEu1JKS4VrMXasJwjhmZM8eK5G"  # password: admin
+    isAdmin: true
+
+# Libraries (NAS directories)
+libraries:
+  - id: "library1"
+    name: "My Pictures"
+    rootPath: "/data/pictures"
+
+# Thumbnail cache
+thumbnailCacheRoot: "/data/thumbnails"
+
+# Upload root (where new upload batches are stored)
+uploadRoot: "/data/uploads"
+
+# Upload/Download limits
+limits:
+  upload:
+    maxFiles: 500
+    maxBytesPerFile: 524288000  # 500 MB
+    maxBytesTotal: 10737418240  # 10 GB
+  download:
+    maxFiles: 10000
+    maxBytes: 21474836480  # 20 GB
+
+# Geocoding
+geocoding:
+  provider: "nominatim"
+  enabled: true
+  userAgent: "PhotoMedit/1.0"
+  rateLimit: 1.0  # seconds between requests
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+

@@ -6,26 +6,34 @@ FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+RUN npm install --production=false
 
 COPY frontend/ .
 RUN npm run build
 
+# Clean up node_modules to reduce size
+RUN rm -rf node_modules
+
 # Stage 2: Python backend with dependencies
 FROM python:3.11-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies and clean up in same layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
     exiftool \
     ffmpeg \
     libmagic1 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --no-compile -r requirements.txt \
+    && find /usr/local/lib/python3.11 -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -type f -name "*.pyc" -delete 2>/dev/null || true
 
 # Copy backend code
 COPY backend/ ./backend/
@@ -35,8 +43,8 @@ COPY config.yaml ./
 # Copy built frontend from builder stage
 COPY --from=frontend-builder /app/frontend/build ./frontend/build
 
-# Create directories for data
-RUN mkdir -p /data/photos /data/archive /data/thumbnails
+# Create directories for data (these will be volumes, but create for safety)
+RUN mkdir -p /data/photos /data/archive /data/thumbnails /data/uploads /data/database
 
 # Expose port
 EXPOSE 4750

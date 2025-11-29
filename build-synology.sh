@@ -18,8 +18,10 @@ echo "🔨 Building Docker image..."
 docker build -t photomedit:latest .
 
 # Save Docker image to tar (for Synology Container Manager import)
+# Note: Synology Container Manager can import .tar.gz files directly
 echo "💾 Saving Docker image to tar..."
 docker save photomedit:latest | gzip > "${BUILD_DIR}/photomedit-image.tar.gz"
+echo "   Compressed size: $(du -h "${BUILD_DIR}/photomedit-image.tar.gz" | cut -f1)"
 
 # Copy configuration files to build directory
 echo "📋 Copying configuration files..."
