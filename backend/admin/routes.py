@@ -248,3 +248,40 @@ def disable_user_mfa(username):
                   user=getattr(request, 'current_user', None), ip_address=request.remote_addr)
     
     return jsonify({'message': 'MFA disabled successfully for user'}), 200
+
+
+@admin_bp.route('/logs', methods=['GET'])
+def get_logs():
+    """Get application logs (admin only)."""
+    error = require_admin()
+    if error:
+        return error
+    
+    # Get query parameters
+    limit = request.args.get('limit', 100, type=int)
+    level = request.args.get('level', None)
+    user = request.args.get('user', None)
+    
+    # Validate limit
+    if limit < 1 or limit > 1000:
+        limit = 100
+    
+    # Get logs
+    logs = LogService.get_logs(limit=limit, level=level, user=user)
+    
+    # Convert to dict format
+    logs_data = []
+    for log in logs:
+        log_dict = {
+            'id': log.id,
+            'timestamp': log.timestamp.isoformat() if log.timestamp else None,
+            'level': log.level,
+            'logger': log.logger,
+            'message': log.message,
+            'user': log.user,
+            'ip_address': log.ip_address,
+            'details': json.loads(log.details) if log.details else None
+        }
+        logs_data.append(log_dict)
+    
+    return jsonify(logs_data), 200
