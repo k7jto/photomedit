@@ -1,5 +1,5 @@
 """Upload routes per upload-download.md specification."""
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
 from backend.config.loader import Config
 from backend.security.sanitizer import PathSanitizer
 from backend.media.metadata_reader import MetadataReader
@@ -145,12 +145,18 @@ def upload_files():
             new_folder_path = os.path.join(library['rootPath'], sanitized_name)
             
             logger.info(f"Creating upload folder: {new_folder_path} (library root: {library['rootPath']})")
+            logger.info(f"Sanitized upload name: '{upload_name}' -> '{sanitized_name}'")
             
             try:
                 if not create_directory_with_permissions(new_folder_path, library['rootPath']):
                     logger.error(f"Failed to create folder in library root: {new_folder_path}")
                     return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
                 logger.info(f"Successfully created folder: {new_folder_path}")
+                # Verify folder exists
+                if os.path.exists(new_folder_path):
+                    logger.info(f"Verified folder exists: {new_folder_path}")
+                else:
+                    logger.error(f"Folder creation reported success but folder does not exist: {new_folder_path}")
             except Exception as e:
                 logger.error(f"Failed to create folder in library root: {e}", exc_info=True)
                 return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
