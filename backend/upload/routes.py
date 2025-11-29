@@ -102,12 +102,15 @@ def upload_files():
     library_id = request.form.get('libraryId', '').strip()
     folder = request.form.get('folder', '').strip()
     
+    logger.info(f"Upload request: uploadName={upload_name}, libraryId={library_id}, folder={folder}")
+    
     # Determine target directory
     if library_id:
         # Uploading to a library
         library = config.get_library(library_id)
         if not library:
-            return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
+            logger.error(f"Library not found: {library_id}")
+            return jsonify({'error': 'not_found', 'message': f'Library not found: {library_id}'}), 404
         
         if folder:
             # Upload directly to specified library folder

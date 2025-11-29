@@ -86,6 +86,12 @@ function MediaGrid() {
     try {
       // Upload directly to current folder, or create new folder in root
       const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
+      // Ensure libraryId is valid
+      if (!libraryId) {
+        alert('Library ID is required for upload')
+        setUploading(false)
+        return
+      }
       await uploadFiles(uploadName, selectedFiles, libraryId, folder)
       setShowUpload(false)
       setUploadName('')

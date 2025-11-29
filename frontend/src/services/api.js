@@ -110,8 +110,9 @@ export const uploadFiles = (uploadName, files, libraryId = null, folder = null) 
   if (folder) {
     formData.append('folder', folder)
   }
+  // Don't set Content-Type header - let axios set it automatically with boundary
   return api.post('/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': undefined }
   })
 }
 
