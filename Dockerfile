@@ -32,10 +32,6 @@ COPY backend/ ./backend/
 COPY wsgi.py ./
 COPY config.yaml ./
 
-# Copy tests
-COPY tests/ ./tests/
-COPY pytest.ini ./
-
 # Copy built frontend from builder stage
 COPY --from=frontend-builder /app/frontend/build ./frontend/build
 

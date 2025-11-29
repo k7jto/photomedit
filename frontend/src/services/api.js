@@ -89,6 +89,7 @@ export const search = (params) => api.get('/search', { params })
 export const getUsers = () => api.get('/admin/users')
 export const createUser = (userData) => api.post('/admin/users', {
   username: userData.username,
+  email: userData.email,
   password: userData.password,
   role: userData.role || (userData.isAdmin ? 'admin' : 'user')
 })
