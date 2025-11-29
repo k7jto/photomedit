@@ -293,6 +293,7 @@ def upload_files():
             
             # Atomically rename
             os.rename(temp_path, final_path)
+            logger.info(f"Successfully saved file: {final_path}")
             
             # Post-upload: import metadata
             try:
@@ -345,10 +346,12 @@ def upload_files():
         else:
             # Created new folder in library root
             folder_name = sanitize_upload_name(upload_name)
+            logger.info(f"Upload complete: {len(uploaded_files)} files uploaded to library root folder: {folder_name}")
             response = {
                 'uploadId': f"{library_id}|{folder_name}",
                 'uploadName': upload_name,
                 'targetDirectory': folder_name,
+                'targetPath': os.path.join(library['rootPath'], folder_name),  # Add full path for debugging
                 'libraryId': library_id,
                 'files': uploaded_files + errors
             }
