@@ -36,8 +36,7 @@ class MetadataWriter:
                 if value is not None and value != '':
                     # Escape special characters in values
                     value_str = str(value).replace('\\', '\\\\').replace('$', '\\$')
-                    # For custom XMP namespaces, use proper format
-                    # XMP:Namespace:TagName format
+                    # Standard tag format: -TagName=value
                     args.append(f'-{key}={value_str}')
             
             # Use -overwrite_original to avoid backup files, -P to preserve file modification date
@@ -197,12 +196,13 @@ class MetadataWriter:
                 tags['EXIF:GPSLatitudeRef'] = 'N' if coords['lat'] >= 0 else 'S'
                 tags['EXIF:GPSLongitudeRef'] = 'E' if coords['lon'] >= 0 else 'W'
         
-        # Review status - use XMP namespace with proper format
+        # Review status - use XMP:UserComment with PhotoMedit prefix
+        # Exiftool doesn't support custom namespaces easily, so we use UserComment
+        # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         if 'reviewStatus' in metadata:
-            # Use XMP namespace format: XMP:Namespace:TagName
-            # For custom tags, we can use XMP:UserComment or create a proper namespace
-            # Using XMP:UserComment for review status (alternative: XMP:PhotoMedit:ReviewStatus)
-            tags['XMP:PhotoMedit:ReviewStatus'] = str(metadata['reviewStatus'])
+            review_value = str(metadata['reviewStatus']).lower()
+            # Store in UserComment with prefix for identification
+            tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
         
         # Write to file
         if is_image:

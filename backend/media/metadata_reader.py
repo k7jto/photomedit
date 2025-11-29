@@ -147,12 +147,15 @@ class MetadataReader:
         if lat and lon:
             metadata['locationCoords'] = {'lat': float(lat), 'lon': float(lon)}
         
-        # Review status - check both old and new tag formats for compatibility
-        review_status = (
-            exif_data.get('XMP:PhotoMedit:ReviewStatus') or
-            exif_data.get('XMP:PhotoMeditReviewStatus') or
-            'unreviewed'
-        )
+        # Review status - read from XMP:UserComment with PhotoMedit prefix
+        # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
+        user_comment = exif_data.get('XMP:UserComment', '')
+        review_status = 'unreviewed'  # Default
+        if isinstance(user_comment, str) and user_comment.startswith('PhotoMedit:'):
+            # Extract review status from UserComment
+            status_part = user_comment.split(':', 1)[1].strip().lower()
+            if status_part in ['reviewed', 'unreviewed']:
+                review_status = status_part
         metadata['reviewStatus'] = review_status
         
         return metadata
