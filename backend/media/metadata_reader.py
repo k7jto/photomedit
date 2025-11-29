@@ -151,17 +151,21 @@ class MetadataReader:
         # Only use UserComment if it contains PhotoMedit prefix (not used for Notes)
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         user_comment = exif_data.get('XMP:UserComment', '')
+        notes = metadata.get('notes', '')
         review_status = 'unreviewed'  # Default
         
         # Check if UserComment is PhotoMedit-specific (starts with "PhotoMedit:")
-        # If it doesn't start with "PhotoMedit:", it might be used for Notes or other purposes
+        # Also check that UserComment is different from Notes (to avoid false positives)
         if isinstance(user_comment, str) and user_comment.startswith('PhotoMedit:'):
             # Extract review status from UserComment
             status_part = user_comment.split(':', 1)[1].strip().lower()
             if status_part in ['reviewed', 'unreviewed']:
                 review_status = status_part
-        # If UserComment doesn't start with "PhotoMedit:", we don't use it for review status
-        # (it might be used for Notes or other purposes)
+        elif isinstance(user_comment, str) and user_comment.strip() and user_comment.strip() == notes.strip():
+            # UserComment is being used for Notes, so don't use it for review status
+            review_status = 'unreviewed'
+        # If UserComment doesn't start with "PhotoMedit:" and is different from Notes,
+        # we don't use it for review status (it might be used for other purposes)
         
         metadata['reviewStatus'] = review_status
         

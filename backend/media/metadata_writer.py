@@ -197,16 +197,34 @@ class MetadataWriter:
                 tags['EXIF:GPSLongitudeRef'] = 'E' if coords['lon'] >= 0 else 'W'
         
         # Review status - use XMP:UserComment with PhotoMedit prefix
-        # Only use UserComment if it's not already being used for Notes
+        # Only use UserComment if it's different from Notes (to avoid overwriting Notes stored in UserComment)
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         if 'reviewStatus' in metadata:
             review_value = str(metadata['reviewStatus']).lower()
-            # Check if UserComment is already being used for Notes
-            # Notes are stored in XMP-dc:description, IPTC:Caption-Abstract, EXIF:ImageDescription
-            # We'll use UserComment for review status, but preserve existing UserComment if it's different from Notes
-            # For now, we'll always use UserComment for review status with PhotoMedit prefix
-            # This allows us to identify PhotoMedit-specific UserComment entries
-            tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
+            
+            # Read existing metadata to check if UserComment is being used for Notes
+            from backend.media.metadata_reader import MetadataReader
+            existing_metadata = MetadataReader.read_logical_metadata(file_path)
+            existing_notes = existing_metadata.get('notes', '')
+            existing_user_comment = existing_metadata.get('XMP:UserComment', '') or ''
+            
+            # Check if UserComment is different from Notes
+            # If UserComment is the same as Notes, we shouldn't overwrite it
+            # If UserComment is empty or PhotoMedit-prefixed, we can use it
+            notes_in_usercomment = (
+                existing_user_comment and 
+                existing_notes and 
+                existing_user_comment.strip() == existing_notes.strip()
+            )
+            
+            # Only write to UserComment if:
+            # 1. It's empty, OR
+            # 2. It's already PhotoMedit-prefixed, OR  
+            # 3. It's different from Notes
+            if not notes_in_usercomment:
+                tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
+            # If UserComment contains Notes, we skip writing review status to UserComment
+            # (in this case, review status won't be persisted - could use a different field)
         
         # Write to file
         if is_image:
