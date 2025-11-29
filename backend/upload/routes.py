@@ -113,7 +113,7 @@ def upload_files():
         library = config.get_library(library_id)
         if not library:
             logger.error(f"Library not found: {library_id}")
-            user = getattr(g, 'current_user', None)
+            user = getattr(g, 'current_user', None) or getattr(request, 'current_user', None)
             LogService.log(
                 level='WARNING',
                 message=f"Upload failed: Library not found: {library_id}",
@@ -375,7 +375,7 @@ def upload_files():
         }
     
     # Log upload result
-    user = getattr(g, 'current_user', None)
+    user = getattr(g, 'current_user', None) or getattr(request, 'current_user', None)
     success_count = len(uploaded_files)
     error_count = len(errors)
     LogService.log(
