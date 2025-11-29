@@ -299,7 +299,12 @@ def upload_files():
             
             # Atomically rename
             os.rename(temp_path, final_path)
-            logger.info(f"Successfully saved file: {final_path}")
+            logger.info(f"Successfully saved file '{original_name}' to '{final_path}'")
+            # Verify file exists
+            if os.path.exists(final_path):
+                logger.info(f"Verified file exists: {final_path} (size: {os.path.getsize(final_path)} bytes)")
+            else:
+                logger.error(f"File save reported success but file does not exist: {final_path}")
             
             # Post-upload: import metadata
             try:
