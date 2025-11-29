@@ -85,8 +85,15 @@ def list_media(library_id: str, folder_id: str):
         
         # Apply review status filter
         file_review_status = metadata.get('reviewStatus', 'unreviewed')
-        if review_status != 'all' and file_review_status != review_status:
-            continue
+        if review_status == 'reviewed':
+            # Show only reviewed images
+            if file_review_status != 'reviewed':
+                continue
+        elif review_status == 'unreviewed':
+            # Show all images that are NOT reviewed (including those without status)
+            if file_review_status == 'reviewed':
+                continue
+        # 'all' shows everything, so no filtering needed
         
         # Determine media type
         ext = mf['extension'].lower()

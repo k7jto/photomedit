@@ -19,8 +19,32 @@ class MediaNavigator:
             review_status = metadata.get('reviewStatus', 'unreviewed')
             
             # Apply filter
-            if review_status_filter == 'all' or review_status == review_status_filter:
+            if review_status_filter == 'all':
+                # Show all images
                 media_list.append({
+                    'path': mf['path'],
+                    'relativePath': mf['relativePath'],
+                    'filename': mf['filename'],
+                    'reviewStatus': review_status
+                })
+            elif review_status_filter == 'reviewed':
+                # Show only reviewed images
+                if review_status == 'reviewed':
+                    media_list.append({
+                        'path': mf['path'],
+                        'relativePath': mf['relativePath'],
+                        'filename': mf['filename'],
+                        'reviewStatus': review_status
+                    })
+            elif review_status_filter == 'unreviewed':
+                # Show all images that are NOT reviewed (including those without status)
+                if review_status != 'reviewed':
+                    media_list.append({
+                        'path': mf['path'],
+                        'relativePath': mf['relativePath'],
+                        'filename': mf['filename'],
+                        'reviewStatus': review_status
+                    })
                     'path': mf['path'],
                     'relativePath': mf['relativePath'],
                     'filename': mf['filename'],
