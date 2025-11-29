@@ -201,6 +201,7 @@ class MetadataWriter:
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         if 'reviewStatus' in metadata:
             review_value = str(metadata['reviewStatus']).lower()
+            logger.info(f"Writing review status '{review_value}' to {file_path}")
             
             # Read existing UserComment directly from exif_data to avoid recursion
             from backend.media.metadata_reader import MetadataReader as MR
@@ -211,6 +212,8 @@ class MetadataWriter:
                 (existing_exif.get('IPTC:Caption-Abstract', '') if existing_exif else '') or
                 ''
             )
+            
+            logger.debug(f"Existing UserComment: '{existing_user_comment}', Existing Notes: '{existing_notes}'")
             
             # Check if UserComment is different from Notes
             # If UserComment is the same as Notes, we shouldn't overwrite it
@@ -227,6 +230,9 @@ class MetadataWriter:
             # 3. It's different from Notes
             if not notes_in_usercomment or existing_user_comment.startswith('PhotoMedit:'):
                 tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
+                logger.info(f"Will write review status to UserComment: 'PhotoMedit:{review_value}'")
+            else:
+                logger.warning(f"Skipping review status write - UserComment contains Notes: '{existing_user_comment}'")
             # If UserComment contains Notes and is not PhotoMedit-prefixed, we skip writing review status
             # (in this case, review status won't be persisted - could use a different field)
         

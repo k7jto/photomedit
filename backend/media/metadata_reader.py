@@ -150,10 +150,15 @@ class MetadataReader:
         # Review status - read from XMP:UserComment with PhotoMedit prefix
         # Only use UserComment if it contains PhotoMedit prefix (not used for Notes)
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
+        import logging
+        logger = logging.getLogger(__name__)
+        
         user_comment = exif_data.get('XMP:UserComment', '')
         # Get notes from exif_data (already extracted above)
         notes = metadata.get('notes', '')
         review_status = 'unreviewed'  # Default
+        
+        logger.debug(f"Reading review status from {file_path}: UserComment='{user_comment}', Notes='{notes}'")
         
         # Check if UserComment is PhotoMedit-specific (starts with "PhotoMedit:")
         # Also check that UserComment is different from Notes (to avoid false positives)
@@ -162,13 +167,18 @@ class MetadataReader:
             status_part = user_comment.split(':', 1)[1].strip().lower()
             if status_part in ['reviewed', 'unreviewed']:
                 review_status = status_part
+                logger.debug(f"Found PhotoMedit review status: '{review_status}'")
         elif isinstance(user_comment, str) and user_comment.strip() and user_comment.strip() == notes.strip():
             # UserComment is being used for Notes, so don't use it for review status
             review_status = 'unreviewed'
+            logger.debug(f"UserComment matches Notes, defaulting to unreviewed")
+        else:
+            logger.debug(f"UserComment doesn't start with 'PhotoMedit:', defaulting to unreviewed")
         # If UserComment doesn't start with "PhotoMedit:" and is different from Notes,
         # we don't use it for review status (it might be used for other purposes)
         
         metadata['reviewStatus'] = review_status
+        logger.debug(f"Final review status for {file_path}: '{review_status}'")
         
         return metadata
 
