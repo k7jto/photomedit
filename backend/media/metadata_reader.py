@@ -151,6 +151,7 @@ class MetadataReader:
         # Only use UserComment if it contains PhotoMedit prefix (not used for Notes)
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         user_comment = exif_data.get('XMP:UserComment', '')
+        # Get notes from exif_data (already extracted above)
         notes = metadata.get('notes', '')
         review_status = 'unreviewed'  # Default
         

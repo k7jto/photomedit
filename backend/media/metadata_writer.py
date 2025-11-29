@@ -205,8 +205,11 @@ class MetadataWriter:
             # Read existing metadata to check if UserComment is being used for Notes
             from backend.media.metadata_reader import MetadataReader
             existing_metadata = MetadataReader.read_logical_metadata(file_path)
-            existing_notes = existing_metadata.get('notes', '')
-            existing_user_comment = existing_metadata.get('XMP:UserComment', '') or ''
+            existing_notes = existing_metadata.get('notes', '') or ''
+            # Read UserComment directly from exif_data to avoid recursion
+            from backend.media.metadata_reader import MetadataReader as MR
+            existing_exif = MR._run_exiftool(file_path, ['-XMP:UserComment'])
+            existing_user_comment = (existing_exif.get('XMP:UserComment', '') if existing_exif else '') or ''
             
             # Check if UserComment is different from Notes
             # If UserComment is the same as Notes, we shouldn't overwrite it

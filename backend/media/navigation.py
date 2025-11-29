@@ -45,11 +45,6 @@ class MediaNavigator:
                         'filename': mf['filename'],
                         'reviewStatus': review_status
                     })
-                    'path': mf['path'],
-                    'relativePath': mf['relativePath'],
-                    'filename': mf['filename'],
-                    'reviewStatus': review_status
-                })
         
         return media_list
     
