@@ -48,6 +48,7 @@ class MetadataWriter:
                 cmd = ['exiftool', '-overwrite_original', '-P', '-m'] + args + [file_path]
             
             logger.debug(f"Running exiftool: {' '.join(cmd)}")
+            logger.info(f"Writing tags to {file_path}: {list(tags.keys())}")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -57,10 +58,16 @@ class MetadataWriter:
             
             if result.returncode != 0:
                 logger.error(f"Exiftool failed for {file_path}: {result.stderr}")
-                logger.debug(f"Exiftool stdout: {result.stdout}")
+                logger.error(f"Exiftool stdout: {result.stdout}")
+                logger.error(f"Exiftool command: {' '.join(cmd)}")
                 return False
             
             logger.info(f"Successfully wrote metadata to {file_path}")
+            # Verify the write by reading back
+            if 'XMP:UserComment' in tags:
+                verify_exif = MetadataReader._run_exiftool(file_path, ['-XMP:UserComment'])
+                verify_comment = verify_exif.get('XMP:UserComment', '') if verify_exif else ''
+                logger.info(f"Verified UserComment after write: '{verify_comment}'")
             return True
         except subprocess.TimeoutExpired:
             logger.error(f"Exiftool timed out for {file_path}")
@@ -206,6 +213,7 @@ class MetadataWriter:
             # Read existing UserComment directly from exif_data to avoid recursion
             from backend.media.metadata_reader import MetadataReader as MR
             existing_exif = MR._run_exiftool(file_path, ['-XMP:UserComment', '-XMP:Description', '-IPTC:Caption-Abstract'])
+            logger.debug(f"Read existing exif data: {existing_exif}")
             existing_user_comment = (existing_exif.get('XMP:UserComment', '') if existing_exif else '') or ''
             existing_notes = (
                 (existing_exif.get('XMP:Description', '') if existing_exif else '') or
