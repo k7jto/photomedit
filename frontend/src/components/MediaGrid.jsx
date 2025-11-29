@@ -10,6 +10,7 @@ function MediaGrid() {
   const [uploadName, setUploadName] = useState('')
   const [selectedFiles, setSelectedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState('')
   const navigate = useNavigate()
   const { libraryId, folderId } = useParams()
 
@@ -75,32 +76,43 @@ function MediaGrid() {
       return
     }
     
-    // If uploading to root, require upload name to create folder
+    // If uploading to root, require upload name to create batch
     if (!folderId && !uploadName.trim()) {
-      alert('Please enter a folder name to create a new folder in the library root')
+      setUploadSuccess('')
+      // Show error inline instead of alert
       return
     }
     
     setUploading(true)
+    setUploadSuccess('')
     
     try {
-      // Upload directly to current folder, or create new folder in root
+      // Upload directly to current folder, or create new batch in root
       const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
       // Ensure libraryId is valid
       if (!libraryId) {
-        alert('Library ID is required for upload')
+        setUploadSuccess('')
         setUploading(false)
         return
       }
-      await uploadFiles(uploadName, selectedFiles, libraryId, folder)
+      const response = await uploadFiles(uploadName, selectedFiles, libraryId, folder)
       setShowUpload(false)
       setUploadName('')
       setSelectedFiles([])
+      
+      // Determine the folder/batch name for the success message
+      const targetDir = response.data.targetDirectory || uploadName || 'this folder'
+      const folderPath = folderId ? targetDir : `/${targetDir}`
+      setUploadSuccess(`Files are in the ${folderPath} folder`)
+      
       // Reload media after upload
       loadMedia()
-      alert('Upload successful! Files are now in this folder.')
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setUploadSuccess(''), 5000)
     } catch (err) {
-      alert(err.response?.data?.message || 'Upload failed')
+      setUploadSuccess('')
+      // Show error inline - could add error state if needed
     } finally {
       setUploading(false)
     }
@@ -161,26 +173,40 @@ function MediaGrid() {
         </div>
       </div>
 
+      {uploadSuccess && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          marginBottom: '1rem',
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid var(--pm-success)',
+          borderRadius: 'var(--pm-radius-sm)',
+          color: 'var(--pm-success)'
+        }}>
+          {uploadSuccess}
+        </div>
+      )}
+
       {showUpload && (
         <div className="pm-form-card" style={{marginBottom: '1.5rem', padding: '1.5rem'}}>
           <h3 style={{marginTop: 0}}>Upload to Current Location</h3>
           <p style={{color: 'var(--pm-text-muted)', fontSize: '0.875rem', marginBottom: '1rem'}}>
-            {folderId ? 'Files will be uploaded directly to this folder.' : 'Enter a name to create a new folder, or leave empty to upload to root.'}
+            {folderId ? 'Files will be uploaded directly to this folder.' : 'Enter a batch name to create a new batch folder.'}
           </p>
           <form onSubmit={handleUpload}>
             {!folderId && (
               <div className="pm-field" style={{marginBottom: '1rem'}}>
-                <div className="pm-field-label">Folder Name</div>
+                <div className="pm-field-label">Batch Name</div>
                 <input
                   className="pm-input"
                   type="text"
                   value={uploadName}
                   onChange={(e) => setUploadName(e.target.value)}
-                  placeholder="Enter name to create a new folder"
+                  placeholder="Enter batch name (e.g., batch3)"
                   maxLength={100}
+                  required
                 />
                 <div style={{fontSize: '0.75rem', color: 'var(--pm-text-muted)', marginTop: '0.25rem'}}>
-                  A new folder will be created with this name in the library root
+                  A new batch folder will be created with this name in the library root
                 </div>
               </div>
             )}
@@ -228,6 +254,11 @@ function MediaGrid() {
               >
                 {uploading ? 'Uploading...' : 'Upload Files'}
               </button>
+              {!folderId && !uploadName.trim() && (
+                <div style={{fontSize: '0.875rem', color: 'var(--pm-error)', marginTop: '0.5rem'}}>
+                  Please enter a batch name to create a new batch folder
+                </div>
+              )}
               <button
                 type="button"
                 className="pm-button pm-button-ghost"
