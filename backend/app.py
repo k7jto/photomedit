@@ -141,6 +141,16 @@ def create_app(config_path: str = None):
     app.register_blueprint(download_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     
+    # Serve favicon
+    @app.route('/favicon.ico')
+    def favicon():
+        favicon_path = os.path.join(app.static_folder, 'favicon.ico')
+        if os.path.exists(favicon_path):
+            return send_from_directory(app.static_folder, 'favicon.ico')
+        else:
+            # Return 204 No Content if favicon doesn't exist
+            return '', 204
+    
     # Serve frontend
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
