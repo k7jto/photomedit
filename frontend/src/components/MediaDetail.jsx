@@ -10,7 +10,7 @@ function MediaDetail() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [formData, setFormData] = useState({})
-  const [markReviewed, setMarkReviewed] = useState(false)
+  const [markReviewed, setMarkReviewed] = useState(true)
   const navigate = useNavigate()
   const { mediaId } = useParams()
 

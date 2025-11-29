@@ -92,18 +92,57 @@ def validate_file_type_binary(file_content: bytes) -> tuple:
 
 @upload_bp.route('/upload', methods=['POST'])
 def upload_files():
-    """Upload media files to uploadRoot with batch naming."""
+    """Upload media files to uploadRoot with batch naming, or directly to a library folder."""
     config = current_app.config.get('PHOTOMEDIT_CONFIG')
     if not config:
         return jsonify({'error': 'internal_error', 'message': 'Configuration not available'}), 500
     
     # Get form data
     upload_name = request.form.get('uploadName', '').strip()
-    if not upload_name:
-        return jsonify({'error': 'validation_error', 'message': 'uploadName is required'}), 400
+    library_id = request.form.get('libraryId', '').strip()
+    folder = request.form.get('folder', '').strip()
     
-    if len(upload_name) > 100:
-        return jsonify({'error': 'validation_error', 'message': 'uploadName too long (max 100 characters)'}), 400
+    # Determine target directory
+    if library_id and folder:
+        # Upload directly to library folder
+        library = config.get_library(library_id)
+        if not library:
+            return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
+        
+        # Validate and sanitize folder path
+        is_valid, resolved_path, error = PathSanitizer.sanitize_path(library['rootPath'], folder)
+        if not is_valid:
+            return jsonify({'error': 'validation_error', 'message': error}), 400
+        
+        # Ensure target directory exists
+        try:
+            os.makedirs(resolved_path, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create target directory: {e}")
+            return jsonify({'error': 'internal_error', 'message': 'Failed to create target directory'}), 500
+        
+        batch_path = resolved_path
+        target_root = library['rootPath']
+    else:
+        # Default: upload to uploadRoot with batch naming
+        if not upload_name:
+            return jsonify({'error': 'validation_error', 'message': 'uploadName is required when not uploading to a folder'}), 400
+        
+        if len(upload_name) > 100:
+            return jsonify({'error': 'validation_error', 'message': 'uploadName too long (max 100 characters)'}), 400
+        
+        # Sanitize upload name and create batch directory
+        sanitized_name = sanitize_upload_name(upload_name)
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        batch_dir_name = f"{sanitized_name}-{timestamp}"
+        batch_path = os.path.join(config.upload_root, batch_dir_name)
+        target_root = config.upload_root
+        
+        try:
+            os.makedirs(batch_path, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create batch directory: {e}")
+            return jsonify({'error': 'internal_error', 'message': 'Failed to create upload directory'}), 500
     
     # Get files
     if 'files' not in request.files:
@@ -119,18 +158,6 @@ def upload_files():
             'error': 'validation_error',
             'message': f'Too many files (max {config.max_upload_files})'
         }), 400
-    
-    # Sanitize upload name and create batch directory
-    sanitized_name = sanitize_upload_name(upload_name)
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    batch_dir_name = f"{sanitized_name}-{timestamp}"
-    batch_path = os.path.join(config.upload_root, batch_dir_name)
-    
-    try:
-        os.makedirs(batch_path, exist_ok=True)
-    except Exception as e:
-        logger.error(f"Failed to create batch directory: {e}")
-        return jsonify({'error': 'internal_error', 'message': 'Failed to create upload directory'}), 500
     
     # Process files
     uploaded_files = []
@@ -239,8 +266,8 @@ def upload_files():
                 logger.warning(f"Failed to import metadata for {final_path}: {e}")
                 # Continue anyway - file is uploaded successfully
             
-            # Calculate relative path from uploadRoot
-            relative_path = os.path.relpath(final_path, config.upload_root).replace(os.sep, '/')
+            # Calculate relative path from target root
+            relative_path = os.path.relpath(final_path, target_root).replace(os.sep, '/')
             
             uploaded_files.append({
                 'originalName': original_name,
@@ -269,11 +296,20 @@ def upload_files():
             })
     
     # Build response
-    response = {
-        'uploadId': batch_dir_name,
-        'uploadName': upload_name,
-        'targetDirectory': batch_dir_name,
-        'files': uploaded_files + errors
-    }
+    if library_id and folder:
+        response = {
+            'uploadId': f"{library_id}|{folder}",
+            'uploadName': upload_name or 'Direct upload',
+            'targetDirectory': folder,
+            'libraryId': library_id,
+            'files': uploaded_files + errors
+        }
+    else:
+        response = {
+            'uploadId': batch_dir_name,
+            'uploadName': upload_name,
+            'targetDirectory': batch_dir_name,
+            'files': uploaded_files + errors
+        }
     
     return jsonify(response), 200

@@ -100,10 +100,18 @@ export const updateUser = (username, userData) => api.put(`/admin/users/${userna
 export const deleteUser = (username) => api.delete(`/admin/users/${username}`)
 
 // Upload API
-export const uploadFiles = (uploadName, files) => {
+export const uploadFiles = (uploadName, files, libraryId = null, folder = null) => {
   const formData = new FormData()
   files.forEach(file => formData.append('files', file))
-  formData.append('uploadName', uploadName)
+  if (uploadName) {
+    formData.append('uploadName', uploadName)
+  }
+  if (libraryId) {
+    formData.append('libraryId', libraryId)
+  }
+  if (folder) {
+    formData.append('folder', folder)
+  }
   return api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })

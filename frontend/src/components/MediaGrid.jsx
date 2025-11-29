@@ -70,20 +70,22 @@ function MediaGrid() {
   const handleUpload = async (e) => {
     e.preventDefault()
     
-    if (!uploadName.trim() || selectedFiles.length === 0) {
-      alert('Please provide an upload name and select files')
+    if (selectedFiles.length === 0) {
+      alert('Please select files to upload')
       return
     }
     
     setUploading(true)
     
     try {
-      await uploadFiles(uploadName, selectedFiles)
+      // Upload directly to current folder
+      const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
+      await uploadFiles(uploadName || 'Upload', selectedFiles, libraryId, folder)
       setShowUpload(false)
       setUploadName('')
       setSelectedFiles([])
       loadMedia() // Reload media after upload
-      alert('Upload successful! Files will appear after processing.')
+      alert('Upload successful! Files are now in this folder.')
     } catch (err) {
       alert(err.response?.data?.message || 'Upload failed')
     } finally {
@@ -149,18 +151,23 @@ function MediaGrid() {
       {showUpload && (
         <div className="pm-form-card" style={{marginBottom: '1.5rem', padding: '1.5rem'}}>
           <h3 style={{marginTop: 0}}>Upload to Current Location</h3>
+          <p style={{color: 'var(--pm-text-muted)', fontSize: '0.875rem', marginBottom: '1rem'}}>
+            Files will be uploaded directly to this folder.
+          </p>
           <form onSubmit={handleUpload}>
             <div className="pm-field" style={{marginBottom: '1rem'}}>
-              <div className="pm-field-label">Upload Name</div>
+              <div className="pm-field-label">Upload Name (optional)</div>
               <input
                 className="pm-input"
                 type="text"
                 value={uploadName}
                 onChange={(e) => setUploadName(e.target.value)}
-                placeholder="e.g., New Photos"
-                required
+                placeholder="Optional: name for this upload"
                 maxLength={100}
               />
+              <div style={{fontSize: '0.75rem', color: 'var(--pm-text-muted)', marginTop: '0.25rem'}}>
+                Leave empty to upload files directly to this folder
+              </div>
             </div>
             <div className="pm-field" style={{marginBottom: '1rem'}}>
               <div className="pm-field-label">Select Files</div>
@@ -202,7 +209,7 @@ function MediaGrid() {
               <button
                 type="submit"
                 className="pm-button pm-button-primary"
-                disabled={uploading || !uploadName.trim() || selectedFiles.length === 0}
+                disabled={uploading || selectedFiles.length === 0}
               >
                 {uploading ? 'Uploading...' : 'Upload Files'}
               </button>
