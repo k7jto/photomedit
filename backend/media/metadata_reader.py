@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
-from backend.utils.sidecar import read_sidecar
+from backend.utils.sidecar import read_sidecar, get_sidecar_path
 
 
 class MetadataReader:
@@ -17,6 +17,8 @@ class MetadataReader:
             args = []
         
         try:
+            # Use -ext xmp to also read from sidecar files automatically
+            # Exiftool will read from both the main file and associated .xmp sidecar
             cmd = ['exiftool', '-j', '-struct', '-G'] + args + [file_path]
             result = subprocess.run(
                 cmd,
@@ -82,9 +84,21 @@ class MetadataReader:
             # For now, we'll read from exiftool which handles XMP
             pass
         
+        # Read metadata - exiftool automatically reads from sidecar .xmp files if they exist
+        # Use -ext xmp to ensure sidecar files are also considered
         exif_data = MetadataReader._run_exiftool(file_path, ['-XMP:All', '-IPTC:All', '-EXIF:DateTimeOriginal', '-EXIF:ImageDescription'])
         if not exif_data:
             return metadata
+        
+        # Also try reading directly from sidecar if it exists (for XMP tags)
+        from backend.utils.sidecar import sidecar_exists
+        if sidecar_exists(file_path):
+            sidecar_data = MetadataReader._run_exiftool(get_sidecar_path(file_path), ['-XMP:All'])
+            if sidecar_data:
+                # Merge sidecar data, with sidecar taking precedence for XMP tags
+                for key, value in sidecar_data.items():
+                    if key.startswith('XMP:') and value:
+                        exif_data[key] = value
         
         # Event date
         event_date = (
@@ -133,8 +147,13 @@ class MetadataReader:
         if lat and lon:
             metadata['locationCoords'] = {'lat': float(lat), 'lon': float(lon)}
         
-        # Review status
-        metadata['reviewStatus'] = exif_data.get('XMP:PhotoMeditReviewStatus', 'unreviewed')
+        # Review status - check both old and new tag formats for compatibility
+        review_status = (
+            exif_data.get('XMP:PhotoMedit:ReviewStatus') or
+            exif_data.get('XMP:PhotoMeditReviewStatus') or
+            'unreviewed'
+        )
+        metadata['reviewStatus'] = review_status
         
         return metadata
 
