@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  photomedit:
+    build: .
+    container_name: photomedit
+    ports:
+      - "4750:4750"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ~/Pictures:/data/pictures:rw
+      - ./data/thumbnails:/data/thumbnails:rw
+    environment:
+      - PHOTOMEDIT_CONFIG=/app/config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4750/api/libraries').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+

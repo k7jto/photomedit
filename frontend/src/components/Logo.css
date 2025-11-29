@@ -1,0 +1,65 @@
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  flex-shrink: 0;
+}
+
+.logo-svg {
+  display: block;
+}
+
+.logo-medium .logo-svg {
+  width: 32px;
+  height: 32px;
+}
+
+.logo-large .logo-svg {
+  width: 48px;
+  height: 48px;
+}
+
+.logo-small .logo-svg {
+  width: 24px;
+  height: 24px;
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--pm-text, white);
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+}
+
+.logo-tagline {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--pm-text-muted, rgba(255, 255, 255, 0.8));
+  margin-top: 0.25rem;
+}
+
+.logo-small .logo-title {
+  font-size: 0.95rem;
+}
+
+.logo-small .logo-tagline {
+  font-size: 0.7rem;
+}
+
+.logo-large .logo-title {
+  font-size: 1.5rem;
+}
+
+.logo-large .logo-tagline {
+  font-size: 0.875rem;
+}
+

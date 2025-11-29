@@ -1,0 +1,92 @@
+import axios from 'axios'
+
+const API_BASE = '/api'
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Add token to requests if available
+let authToken = null
+let onUnauthorized = null
+
+export const setUnauthorizedHandler = (handler) => {
+  onUnauthorized = handler
+}
+
+export const setAuthToken = (token) => {
+  authToken = token
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  } else {
+    delete api.defaults.headers.common['Authorization']
+  }
+}
+
+// Add response interceptor to handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && onUnauthorized) {
+      // Clear token and redirect to login
+      sessionStorage.removeItem('authToken')
+      setAuthToken(null)
+      onUnauthorized()
+    }
+    return Promise.reject(error)
+  }
+)
+
+// Auth API
+export const login = async (username, password) => {
+  const response = await api.post('/auth/login', { username, password })
+  if (response.data.token) {
+    setAuthToken(response.data.token)
+  }
+  return response.data
+}
+
+// Libraries API
+export const getLibraries = () => api.get('/libraries')
+export const getFolders = (libraryId, parent = '') => 
+  api.get(`/libraries/${libraryId}/folders`, { params: { parent } })
+export const getMedia = (libraryId, folderId, reviewStatus = 'unreviewed') =>
+  api.get(`/libraries/${libraryId}/folders/${folderId}/media`, { params: { reviewStatus } })
+
+// Media API
+export const getMediaDetail = (mediaId) => api.get(`/media/${mediaId}`)
+export const updateMedia = (mediaId, data) => api.patch(`/media/${mediaId}`, data)
+export const rejectMedia = (mediaId) => api.post(`/media/${mediaId}/reject`)
+export const navigateMedia = (mediaId, direction, reviewStatus = 'unreviewed') =>
+  api.get(`/media/${mediaId}/navigate`, { params: { direction, reviewStatus } })
+
+// Get image URLs with auth token
+const getImageUrl = (mediaId, type) => {
+  const token = sessionStorage.getItem('authToken')
+  const encodedId = encodeURIComponent(mediaId)
+  return `${API_BASE}/media/${encodedId}/${type}${token ? `?token=${encodeURIComponent(token)}` : ''}`
+}
+
+export const getPreviewUrl = (mediaId) => getImageUrl(mediaId, 'preview')
+export const getThumbnailUrl = (mediaId) => getImageUrl(mediaId, 'thumbnail')
+
+// Search API
+export const search = (params) => api.get('/search', { params })
+
+// Upload API
+export const uploadFiles = (libraryId, files, targetFolder, batchName) => {
+  const formData = new FormData()
+  files.forEach(file => formData.append('files', file))
+  formData.append('targetFolder', targetFolder)
+  if (batchName) formData.append('batchName', batchName)
+  return api.post(`/libraries/${libraryId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export default api
+

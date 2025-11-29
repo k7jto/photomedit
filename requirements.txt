@@ -1,0 +1,16 @@
+Flask==3.0.0
+Flask-CORS==4.0.0
+PyJWT==2.8.0
+bcrypt==4.1.1
+PyYAML==6.0.1
+pydantic==2.5.2
+Pillow==10.1.0
+numpy==1.26.4
+rawpy==0.20.0
+python-magic==0.4.27
+gunicorn==21.2.0
+requests==2.31.0
+Werkzeug==3.0.1
+pytest==7.4.3
+pytest-cov==4.1.0
+

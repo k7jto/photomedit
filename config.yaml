@@ -1,0 +1,37 @@
+# PhotoMedit Configuration
+
+# Server settings
+server:
+  port: 4750
+  host: "0.0.0.0"
+  jwtSecret: "change-me-in-production-use-strong-random-secret"
+
+# Authentication
+auth:
+  enabled: true
+  users:
+    - username: "admin"
+      passwordHash: "$2b$12$1aCOPTBsVc.cjOJnQqhcuue84mGVEu1JKS4VrMXasJwjhmZM8eK5G"  # password: admin
+    - username: "user"
+      passwordHash: "$2b$12$8RkLdssZ9eC385zWSQL10OJ2QSnMK9fpJLdFGayzFOKjXM8HCxwHu"  # password: user
+
+# Libraries (NAS directories)
+libraries:
+  - id: "library1"
+    name: "My Pictures"
+    rootPath: "/data/pictures"
+
+# Thumbnail cache
+thumbnailCacheRoot: "/data/thumbnails"
+
+# Geocoding
+geocoding:
+  provider: "nominatim"
+  enabled: true
+  userAgent: "PhotoMedit/1.0"
+  rateLimit: 1.0  # seconds between requests
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
