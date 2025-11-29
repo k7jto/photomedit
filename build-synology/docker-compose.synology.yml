@@ -25,7 +25,7 @@ services:
       - "4750:4750"
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - /volume1/photos:/data/pictures:rw
+      - /volume1/Memories:/data/pictures:rw
       - ./data/thumbnails:/data/thumbnails:rw
       - ./data/uploads:/data/uploads:rw
     environment:
