@@ -201,12 +201,10 @@ class MetadataWriter:
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         if 'reviewStatus' in metadata:
             review_value = str(metadata['reviewStatus']).lower()
-            logger.info(f"Writing review status '{review_value}' to {file_path}")
             
-            # Read existing UserComment directly from exif_data to avoid recursion
+            # Read existing UserComment and Notes to check if UserComment is being used for Notes
             from backend.media.metadata_reader import MetadataReader as MR
             existing_exif = MR._run_exiftool(file_path, ['-XMP:UserComment', '-XMP:Description', '-IPTC:Caption-Abstract'])
-            logger.debug(f"Read existing exif data: {existing_exif}")
             existing_user_comment = (existing_exif.get('XMP:UserComment', '') if existing_exif else '') or ''
             existing_notes = (
                 (existing_exif.get('XMP:Description', '') if existing_exif else '') or
@@ -214,28 +212,15 @@ class MetadataWriter:
                 ''
             )
             
-            logger.debug(f"Existing UserComment: '{existing_user_comment}', Existing Notes: '{existing_notes}'")
-            
-            # Check if UserComment is different from Notes
-            # If UserComment is the same as Notes, we shouldn't overwrite it
-            # If UserComment is empty or PhotoMedit-prefixed, we can use it
+            # Only write to UserComment if it's empty, PhotoMedit-prefixed, or different from Notes
             notes_in_usercomment = (
                 existing_user_comment and 
                 existing_notes and 
                 existing_user_comment.strip() == existing_notes.strip()
             )
             
-            # Only write to UserComment if:
-            # 1. It's empty, OR
-            # 2. It's already PhotoMedit-prefixed, OR  
-            # 3. It's different from Notes
             if not notes_in_usercomment or existing_user_comment.startswith('PhotoMedit:'):
                 tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
-                logger.info(f"Will write review status to UserComment: 'PhotoMedit:{review_value}'")
-            else:
-                logger.warning(f"Skipping review status write - UserComment contains Notes: '{existing_user_comment}'")
-            # If UserComment contains Notes and is not PhotoMedit-prefixed, we skip writing review status
-            # (in this case, review status won't be persisted - could use a different field)
         
         # Write to file
         if is_image:
