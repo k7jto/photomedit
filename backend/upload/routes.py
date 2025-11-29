@@ -144,12 +144,15 @@ def upload_files():
             sanitized_name = sanitize_upload_name(upload_name)
             new_folder_path = os.path.join(library['rootPath'], sanitized_name)
             
+            logger.info(f"Creating upload folder: {new_folder_path} (library root: {library['rootPath']})")
+            
             try:
-                if not create_directory_with_permissions(new_folder_path):
+                if not create_directory_with_permissions(new_folder_path, library['rootPath']):
                     logger.error(f"Failed to create folder in library root: {new_folder_path}")
                     return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
+                logger.info(f"Successfully created folder: {new_folder_path}")
             except Exception as e:
-                logger.error(f"Failed to create folder in library root: {e}")
+                logger.error(f"Failed to create folder in library root: {e}", exc_info=True)
                 return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
             
             batch_path = new_folder_path
@@ -273,6 +276,7 @@ def upload_files():
         
         try:
             # Write to temp file
+            logger.debug(f"Writing file to temp path: {temp_path}")
             with open(temp_path, 'wb') as f:
                 shutil.copyfileobj(file, f)
             
