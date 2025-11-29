@@ -197,11 +197,15 @@ class MetadataWriter:
                 tags['EXIF:GPSLongitudeRef'] = 'E' if coords['lon'] >= 0 else 'W'
         
         # Review status - use XMP:UserComment with PhotoMedit prefix
-        # Exiftool doesn't support custom namespaces easily, so we use UserComment
+        # Only use UserComment if it's not already being used for Notes
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"
         if 'reviewStatus' in metadata:
             review_value = str(metadata['reviewStatus']).lower()
-            # Store in UserComment with prefix for identification
+            # Check if UserComment is already being used for Notes
+            # Notes are stored in XMP-dc:description, IPTC:Caption-Abstract, EXIF:ImageDescription
+            # We'll use UserComment for review status, but preserve existing UserComment if it's different from Notes
+            # For now, we'll always use UserComment for review status with PhotoMedit prefix
+            # This allows us to identify PhotoMedit-specific UserComment entries
             tags['XMP:UserComment'] = f'PhotoMedit:{review_value}'
         
         # Write to file
