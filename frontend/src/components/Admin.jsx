@@ -20,9 +20,10 @@ function Admin() {
     setError('')
     try {
       const response = await getUsers()
-      setUsers(response.data)
+      setUsers(response.data || [])
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load users')
+      setUsers([]) // Set empty array on error to prevent blank page
     } finally {
       setLoading(false)
     }
@@ -34,14 +35,15 @@ function Admin() {
     setSuccess('')
     
     try {
-      await createUser(formData)
+      const response = await createUser(formData)
       setSuccess('User created successfully')
       setShowCreateForm(false)
       setFormData({ username: '', email: '', password: '', role: 'user' })
-      loadUsers()
+      await loadUsers() // Wait for users to reload
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create user')
+      setShowCreateForm(true) // Keep form open on error
     }
   }
 
@@ -91,12 +93,13 @@ function Admin() {
     setShowCreateForm(false)
   }
 
-  if (loading) {
-    return <div>Loading...</div>
-  }
-
   return (
     <div className="pm-admin">
+      {loading && (
+        <div style={{padding: '2rem', textAlign: 'center', color: 'var(--pm-text-muted)'}}>
+          Loading users...
+        </div>
+      )}
       <div className="pm-panel">
         <div className="pm-panel-header">
           <h2>User Management</h2>
