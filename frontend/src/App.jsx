@@ -6,6 +6,7 @@ import MediaDetail from './components/MediaDetail'
 import Login from './components/Login'
 import ForgotPassword from './components/ForgotPassword'
 import Admin from './components/Admin'
+import Logs from './components/Logs'
 import MFASetup from './components/MFASetup'
 import Upload from './components/Upload'
 import { setAuthToken, setUnauthorizedHandler } from './services/api'
@@ -77,9 +78,10 @@ function App() {
           <Route path=":libraryId/folder/:folderId" element={<MediaGrid />} />
           <Route path="media/:mediaId" element={<MediaDetail />} />
         </Route>
-        <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-        <Route path="/mfa-setup" element={<ProtectedRoute><MFASetup /></ProtectedRoute>} />
-        <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
+              <Route path="/mfa-setup" element={<ProtectedRoute><MFASetup /></ProtectedRoute>} />
+              <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
       </Routes>
     </div>
   )

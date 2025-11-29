@@ -1,0 +1,61 @@
+.pm-logs {
+  padding: 1.5rem;
+}
+
+.pm-logs .pm-panel {
+  background: var(--pm-surface);
+  border-radius: var(--pm-radius-md);
+  padding: 1.5rem;
+}
+
+.pm-logs .pm-panel-header {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--pm-border-soft);
+  padding-bottom: 1rem;
+}
+
+.pm-logs .pm-panel-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--pm-text);
+}
+
+.pm-logs .pm-table {
+  overflow-x: auto;
+}
+
+.pm-logs table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.pm-logs thead {
+  background: var(--pm-surface-soft);
+  border-bottom: 2px solid var(--pm-border-soft);
+}
+
+.pm-logs th {
+  text-align: left;
+  padding: 0.75rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pm-logs td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--pm-border-soft);
+  font-size: 0.875rem;
+}
+
+.pm-logs tbody tr:hover {
+  background: var(--pm-surface-soft);
+}
+
+.pm-logs tbody tr:last-child td {
+  border-bottom: none;
+}
+

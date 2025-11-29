@@ -1,6 +1,7 @@
 """Admin routes for user management."""
 from flask import Blueprint, request, jsonify, current_app
 import bcrypt
+import json
 from backend.config.loader import Config
 from backend.auth.mfa import MFAManager
 from backend.database.user_service import UserService

@@ -90,6 +90,12 @@ export const search = (params) => api.get('/search', { params })
 
 // Admin API
 export const getUsers = () => api.get('/admin/users')
+export const getLogs = (limit = 100, level = null, user = null) => {
+  const params = { limit }
+  if (level) params.level = level
+  if (user) params.user = user
+  return api.get('/admin/logs', { params })
+}
 export const createUser = (userData) => api.post('/admin/users', {
   username: userData.username,
   email: userData.email,

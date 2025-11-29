@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getUsers, createUser, updateUser, deleteUser } from '../services/api'
 import './Admin.css'
 
 function Admin() {
+  const navigate = useNavigate()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -100,20 +102,28 @@ function Admin() {
           Loading users...
         </div>
       )}
-      <div className="pm-panel">
-        <div className="pm-panel-header">
-          <h2>User Management</h2>
-          <button 
-            className="pm-button pm-button-primary"
-            onClick={() => {
-              setShowCreateForm(true)
-              setEditingUser(null)
-              setFormData({ username: '', email: '', password: '', role: 'user' })
-            }}
-          >
-            + Add User
-          </button>
-        </div>
+        <div className="pm-panel">
+          <div className="pm-panel-header">
+            <h2>User Management</h2>
+            <div style={{display: 'flex', gap: '0.5rem'}}>
+              <button
+                className="pm-button pm-button-ghost"
+                onClick={() => navigate('/logs')}
+              >
+                View Logs
+              </button>
+              <button
+                className="pm-button pm-button-primary"
+                onClick={() => {
+                  setShowCreateForm(true)
+                  setEditingUser(null)
+                  setFormData({ username: '', email: '', password: '', role: 'user' })
+                }}
+              >
+                + Add User
+              </button>
+            </div>
+          </div>
 
         {error && <div style={{color: 'var(--pm-error)', padding: '0.5rem', marginBottom: '1rem'}}>{error}</div>}
         {success && <div style={{color: 'var(--pm-success)', padding: '0.5rem', marginBottom: '1rem'}}>{success}</div>}
