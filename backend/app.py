@@ -66,9 +66,9 @@ def create_app(config_path: str = None):
     @app.before_request
     def check_auth():
         """Check JWT authentication for protected routes."""
-        # Skip auth check for login, password reset, and static files
-        skip_endpoints = ['auth.login', 'auth.forgot_password', 'auth.reset_password', 'static', 'serve_frontend']
-        if request.endpoint in skip_endpoints or '/forgot-password' in request.path or '/reset-password' in request.path:
+        # Skip auth check for login, password reset, static files, and favicon
+        skip_endpoints = ['auth.login', 'auth.forgot_password', 'auth.reset_password', 'static', 'serve_frontend', 'favicon']
+        if request.endpoint in skip_endpoints or '/forgot-password' in request.path or '/reset-password' in request.path or request.path == '/favicon.ico':
             return
         
         if not config.auth_enabled:
