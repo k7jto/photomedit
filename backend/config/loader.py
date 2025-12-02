@@ -32,6 +32,10 @@ class Config:
         # Libraries
         self.libraries = raw_config.get('libraries', [])
         
+        # Resolve library paths: convert host paths to container mount points if needed
+        # This allows config to use either host paths (like PhotoPrism) or container paths
+        self._resolve_library_paths()
+        
         # Thumbnail cache
         self.thumbnail_cache_root = raw_config.get('thumbnailCacheRoot', '/data/thumbnails')
         os.makedirs(self.thumbnail_cache_root, exist_ok=True)
@@ -76,6 +80,47 @@ class Config:
             if lib.get('id') == library_id:
                 return lib
         return None
+    
+    def _resolve_library_paths(self):
+        """
+        Resolve library paths from host paths to container mount points.
+        
+        This allows the config to use host paths (like /volume1/Memories) which
+        will be automatically resolved to container mount points (like /data/pictures).
+        This matches PhotoPrism's behavior where you can use host paths directly.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Common path mappings: host_path -> container_path
+        # These match typical Docker volume mounts
+        path_mappings = {
+            '/volume1/Memories': '/data/pictures',
+            '/volume1/photos': '/data/pictures',
+            '/volume1/pictures': '/data/pictures',
+            # Add more mappings as needed
+        }
+        
+        for library in self.libraries:
+            root_path = library.get('rootPath', '')
+            if not root_path:
+                continue
+            
+            original_path = root_path
+            
+            # Check if this is a known host path that should be mapped
+            for host_path, container_path in path_mappings.items():
+                if root_path == host_path or root_path.startswith(host_path + '/'):
+                    # Replace host path with container path
+                    if root_path == host_path:
+                        library['rootPath'] = container_path
+                    else:
+                        # Handle subdirectories: /volume1/Memories/subdir -> /data/pictures/subdir
+                        relative = root_path[len(host_path):]
+                        library['rootPath'] = container_path + relative
+                    
+                    logger.info(f"Path resolution: '{original_path}' -> '{library['rootPath']}' (host path resolved to container mount point)")
+                    break
     
     def get_admin_user(self) -> Optional[Dict[str, Any]]:
         """Get admin user from config."""

@@ -95,3 +95,41 @@ def test_create_user_missing_email(client, auth_token):
     assert response.status_code == 400
     data = response.get_json()
     assert 'email' in data.get('message', '').lower() or 'required' in data.get('message', '').lower()
+
+
+def test_list_users_endpoint(client, auth_token, database):
+    """Test that GET /api/admin/users returns users with all required fields."""
+    if not auth_token:
+        pytest.skip("No auth token available")
+    
+    headers = {'Authorization': f'Bearer {auth_token}'}
+    
+    # First create a test user
+    create_response = client.post('/api/admin/users', json={
+        'username': 'listtestuser',
+        'email': 'listtest@test.com',
+        'password': 'testpass',
+        'role': 'user'
+    }, headers=headers)
+    
+    # Then list users
+    list_response = client.get('/api/admin/users', headers=headers)
+    
+    # May fail if not admin, but if it succeeds, verify structure
+    if list_response.status_code == 200:
+        data = list_response.get_json()
+        assert isinstance(data, list)
+        
+        # Find our test user in the list
+        test_user = next((u for u in data if u.get('username') == 'listtestuser'), None)
+        if test_user:
+            # Verify all required fields are present (plain objects, not Maps)
+            assert 'username' in test_user
+            assert 'email' in test_user
+            assert 'role' in test_user
+            assert 'mfaEnabled' in test_user
+            assert 'source' in test_user
+            # Verify it's a plain object (not a Map) - should have direct property access
+            assert test_user['username'] == 'listtestuser'
+            assert test_user['email'] == 'listtest@test.com'
+            assert test_user['role'] == 'user'

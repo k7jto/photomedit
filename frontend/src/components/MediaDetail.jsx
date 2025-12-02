@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { getMediaDetail, updateMedia, rejectMedia, navigateMedia, getPreviewUrl, getThumbnailUrl } from '../services/api'
+import { useMediaCache } from '../contexts/MediaCacheContext'
 
 function MediaDetail() {
   const [media, setMedia] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [navigating, setNavigating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [error, setError] = useState('')
@@ -12,7 +14,35 @@ function MediaDetail() {
   const [formData, setFormData] = useState({})
   const [markReviewed, setMarkReviewed] = useState(true)
   const navigate = useNavigate()
+  const location = useLocation()
   const { mediaId } = useParams()
+  const { updateMediaItem, removeMediaItem } = useMediaCache()
+  
+  // Extract libraryId and folderId from the previous location state or mediaId
+  const getLibraryAndFolder = () => {
+    // Try to get from location state (set when navigating from MediaGrid)
+    if (location.state?.libraryId && location.state?.folderId !== undefined) {
+      return {
+        libraryId: location.state.libraryId,
+        folderId: location.state.folderId,
+        reviewStatus: location.state.reviewStatus || 'unreviewed'
+      }
+    }
+    
+    // Fallback: extract from mediaId (format: "libraryId|relativePath")
+    if (mediaId && mediaId.includes('|')) {
+      const [libraryId, ...pathParts] = mediaId.split('|')
+      const relativePath = pathParts.join('|')
+      // Extract folder from path (everything except filename)
+      const pathPartsArray = relativePath.split('/')
+      const folderId = pathPartsArray.length > 1 
+        ? pathPartsArray.slice(0, -1).join('/')
+        : ''
+      return { libraryId, folderId, reviewStatus: 'unreviewed' }
+    }
+    
+    return null
+  }
 
   useEffect(() => {
     loadMedia()
@@ -22,19 +52,21 @@ function MediaDetail() {
     const handleKeyPress = (e) => {
       if (e.key === 'Escape') {
         navigate(-1)
-      } else if (e.key === 'ArrowLeft' || (e.ctrlKey && e.key === 'ArrowLeft')) {
+      } else if ((e.key === 'ArrowLeft' || (e.ctrlKey && e.key === 'ArrowLeft')) && !navigating && !loading) {
         handleNavigate('previous')
-      } else if (e.key === 'ArrowRight' || (e.ctrlKey && e.key === 'ArrowRight')) {
+      } else if ((e.key === 'ArrowRight' || (e.ctrlKey && e.key === 'ArrowRight')) && !navigating && !loading) {
         handleNavigate('next')
       } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        handleSave()
+        if (!saving) {
+          handleSave()
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [media, formData])
+  }, [media, formData, navigating, loading, saving])
 
   const loadMedia = async () => {
     if (!mediaId) return
@@ -86,6 +118,28 @@ function MediaDetail() {
       setSuccess('Metadata saved successfully' + (markReviewed ? ' and marked as reviewed' : ''))
       if (markReviewed) {
         setFormData(prev => ({ ...prev, reviewStatus: 'reviewed' }))
+        
+        // Update cache optimistically
+        const context = getLibraryAndFolder()
+        if (context) {
+          updateMediaItem(
+            context.libraryId,
+            context.folderId,
+            context.reviewStatus,
+            decodeURIComponent(mediaId),
+            { reviewStatus: 'reviewed' }
+          )
+          
+          // If filtering by unreviewed, remove from cache
+          if (context.reviewStatus === 'unreviewed') {
+            removeMediaItem(
+              context.libraryId,
+              context.folderId,
+              context.reviewStatus,
+              decodeURIComponent(mediaId)
+            )
+          }
+        }
       }
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
@@ -118,16 +172,36 @@ function MediaDetail() {
   }
 
   const handleNavigate = async (direction) => {
-    if (!media) return
+    if (!media || navigating) return
+    
+    setNavigating(true)
+    setError('')
     
     try {
-      const reviewStatus = formData.reviewStatus || 'unreviewed'
+      const context = getLibraryAndFolder()
+      const reviewStatus = context?.reviewStatus || formData.reviewStatus || 'unreviewed'
       const response = await navigateMedia(decodeURIComponent(mediaId), direction, reviewStatus)
+      
       if (response.data.nextId) {
-        navigate(`/media/${encodeURIComponent(response.data.nextId)}`)
+        // Preserve location state when navigating
+        navigate(`/media/${encodeURIComponent(response.data.nextId)}`, {
+          state: context || {
+            libraryId: mediaId.split('|')[0],
+            folderId: '',
+            reviewStatus
+          }
+        })
+      } else {
+        // No next/previous item found
+        setError(`No ${direction === 'next' ? 'next' : 'previous'} item found`)
+        setTimeout(() => setError(''), 2000)
       }
     } catch (err) {
       console.error('Navigation failed:', err)
+      setError(err.response?.data?.message || `Failed to navigate ${direction}`)
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setNavigating(false)
     }
   }
 
@@ -148,11 +222,50 @@ function MediaDetail() {
             <span className="pm-media-title" style={{marginLeft: '1rem'}}>{media.filename}</span>
           </div>
           <div className="pm-toolbar-right">
-            <button className="pm-button pm-button-ghost" onClick={() => handleNavigate('previous')}>← Previous</button>
-            <button className="pm-button pm-button-ghost" onClick={() => handleNavigate('next')}>Next →</button>
+            <button 
+              className="pm-button pm-button-ghost" 
+              onClick={() => handleNavigate('previous')}
+              disabled={navigating || loading}
+            >
+              {navigating ? 'Loading...' : '← Previous'}
+            </button>
+            <button 
+              className="pm-button pm-button-ghost" 
+              onClick={() => handleNavigate('next')}
+              disabled={navigating || loading}
+            >
+              {navigating ? 'Loading...' : 'Next →'}
+            </button>
           </div>
         </div>
-        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', padding: '2rem', background: 'var(--pm-surface)', borderRadius: 'var(--pm-radius-md)'}}>
+        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', padding: '2rem', background: 'var(--pm-surface)', borderRadius: 'var(--pm-radius-md)', position: 'relative'}}>
+          {(loading || navigating) && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 10,
+              background: 'rgba(15, 23, 42, 0.95)',
+              padding: '1rem 2rem',
+              borderRadius: 'var(--pm-radius-md)',
+              border: '1px solid var(--pm-border-soft)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              color: 'var(--pm-text)'
+            }}>
+              <div style={{
+                width: '20px',
+                height: '20px',
+                border: '2px solid var(--pm-accent-soft)',
+                borderTopColor: 'var(--pm-accent)',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite'
+              }}></div>
+              <span>{loading ? 'Loading image...' : 'Loading next image...'}</span>
+            </div>
+          )}
           <img 
             src={getPreviewUrl(mediaId)} 
             alt={media.filename} 
@@ -160,7 +273,9 @@ function MediaDetail() {
               maxWidth: '100%',
               maxHeight: '80vh',
               objectFit: 'contain',
-              borderRadius: 'var(--pm-radius-md)'
+              borderRadius: 'var(--pm-radius-md)',
+              opacity: (loading || navigating) ? 0.3 : 1,
+              transition: 'opacity 0.2s ease'
             }}
             onError={(e) => {
               // Fallback to thumbnail if preview fails

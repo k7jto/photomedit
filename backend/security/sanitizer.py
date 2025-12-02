@@ -20,16 +20,20 @@ class PathSanitizer:
             if os.path.isabs(relative_path):
                 return False, None, "Absolute paths are not allowed"
             
-            # Reject paths with '..' components
-            if '..' in relative_path:
-                return False, None, "Path traversal ('..') is not allowed"
-            
-            # Normalize the path
-            normalized = os.path.normpath(relative_path)
-            
-            # Check again for '..' after normalization
-            if '..' in normalized or normalized.startswith('/'):
-                return False, None, "Invalid path"
+            # Handle empty path (root directory)
+            if not relative_path or relative_path == '':
+                normalized = '.'
+            else:
+                # Reject paths with '..' components
+                if '..' in relative_path:
+                    return False, None, "Path traversal ('..') is not allowed"
+                
+                # Normalize the path
+                normalized = os.path.normpath(relative_path)
+                
+                # Check again for '..' after normalization
+                if '..' in normalized or normalized.startswith('/'):
+                    return False, None, "Invalid path"
             
             # Resolve against root
             root = Path(root_path).resolve()

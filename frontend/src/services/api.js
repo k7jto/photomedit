@@ -27,6 +27,39 @@ export const setAuthToken = (token) => {
   }
 }
 
+// Add request interceptor to prevent API calls without token (except auth endpoints)
+api.interceptors.request.use(
+  (config) => {
+    // Allow auth endpoints without token
+    const authEndpoints = ['/auth/login', '/auth/forgot-password', '/auth/reset-password']
+    const isAuthEndpoint = authEndpoints.some(endpoint => config.url?.includes(endpoint))
+    
+    // Check if we have a token (either in memory or sessionStorage)
+    const token = authToken || sessionStorage.getItem('authToken')
+    
+    // If it's not an auth endpoint and we don't have a token, reject the request
+    if (!isAuthEndpoint && !token) {
+      // Trigger unauthorized handler if available
+      if (onUnauthorized) {
+        onUnauthorized()
+      }
+      // Return a rejected promise that looks like an axios error
+      return Promise.reject({
+        response: {
+          status: 401,
+          data: { error: 'unauthorized', message: 'No authentication token available' }
+        },
+        config
+      })
+    }
+    
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
 // Add response interceptor to handle 401 errors
 api.interceptors.response.use(
   (response) => response,
@@ -65,7 +98,9 @@ export const getMedia = (libraryId, folderId, reviewStatus = 'unreviewed') => {
   if (!folderId || folderId === '') {
     return api.get(`/libraries/${libraryId}/folders/media`, { params: { reviewStatus } })
   }
-  return api.get(`/libraries/${libraryId}/folders/${folderId}/media`, { params: { reviewStatus } })
+  // URL encode the folderId to handle paths with slashes (e.g., "Old Photos/2016")
+  const encodedFolderId = encodeURIComponent(folderId)
+  return api.get(`/libraries/${libraryId}/folders/${encodedFolderId}/media`, { params: { reviewStatus } })
 }
 
 // Media API

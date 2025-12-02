@@ -46,6 +46,27 @@ COPY --from=frontend-builder /app/frontend/build ./frontend/build
 # Create directories for data (these will be volumes, but create for safety)
 RUN mkdir -p /data/photos /data/archive /data/thumbnails /data/uploads /data/database
 
+# Create a non-root user for running the application
+# Default to UID 1000 (common for first user on Linux systems)
+# Set RUN_AS_ROOT=1 to skip user creation and run as root
+ARG PUID=1000
+ARG PGID=1000
+ARG RUN_AS_ROOT=0
+
+RUN if [ "${RUN_AS_ROOT}" != "1" ]; then \
+        groupadd -g ${PGID} photomedit 2>/dev/null || true && \
+        useradd -u ${PUID} -g ${PGID} -s /bin/bash -m photomedit 2>/dev/null || true && \
+        chown -R photomedit:photomedit /app /data 2>/dev/null || true && \
+        echo "Created photomedit user (UID ${PUID}, GID ${PGID})"; \
+    else \
+        echo "Running as root (RUN_AS_ROOT=1)"; \
+    fi
+
+# Switch to non-root user only if not running as root
+# Dockerfile USER doesn't support variables, so we'll handle this in entrypoint
+# For now, default to root to avoid breaking existing deployments
+# USER photomedit
+
 # Expose port
 EXPOSE 4750
 

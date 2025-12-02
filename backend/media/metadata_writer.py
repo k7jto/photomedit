@@ -224,18 +224,27 @@ class MetadataWriter:
         
         # Write to file
         if is_image:
+            # Determine if this is a RAW file (needs sidecar) or standard image (embedded only)
+            ext = Path(file_path).suffix.lower()
+            raw_extensions = {'.orf', '.nef', '.cr2', '.cr3', '.raf', '.arw', '.dng', '.rw2', '.srw', '.pef', '.x3f'}
+            is_raw = ext in raw_extensions
+            
             # Write to embedded metadata first (all tags)
             embedded_success = MetadataWriter._run_exiftool(file_path, tags, write_sidecar=False)
             
-            # Also write XMP tags to sidecar file
-            # Extract only XMP tags for sidecar
-            xmp_tags = {k: v for k, v in tags.items() if k.startswith('XMP')}
-            if xmp_tags:
-                sidecar_success = MetadataWriter._run_exiftool(file_path, xmp_tags, write_sidecar=True)
+            # Only create sidecar for RAW files (JPGs and other standard formats support embedded XMP)
+            if is_raw:
+                # Also write XMP tags to sidecar file for RAW files
+                # Extract only XMP tags for sidecar
+                xmp_tags = {k: v for k, v in tags.items() if k.startswith('XMP')}
+                if xmp_tags:
+                    sidecar_success = MetadataWriter._run_exiftool(file_path, xmp_tags, write_sidecar=True)
+                else:
+                    sidecar_success = True  # No XMP tags to write
+                return embedded_success and sidecar_success
             else:
-                sidecar_success = True  # No XMP tags to write
-            
-            return embedded_success and sidecar_success
+                # For JPGs and other standard formats, embedded metadata only (no sidecar)
+                return embedded_success
         else:
             # For videos, write primarily to sidecar (XMP tags only)
             xmp_tags = {k: v for k, v in tags.items() if k.startswith('XMP')}

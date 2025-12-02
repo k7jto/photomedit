@@ -148,19 +148,45 @@ def get_thumbnail(media_id: str):
             file_size = os.path.getsize(media_path)
             if file_size < 5 * 1024 * 1024:  # Less than 5MB, serve directly
                 return send_file(media_path, mimetype='image/jpeg')
-            # Otherwise generate thumbnail
+            # Otherwise check for cached thumbnail first
             thumbnail_path = preview_gen.generate_image_thumbnail(media_path)
             if thumbnail_path and os.path.exists(thumbnail_path):
                 return send_file(thumbnail_path, mimetype='image/jpeg')
-            # Fallback to original if thumbnail generation fails
+            # If no cached thumbnail, queue it for background generation and serve original
+            try:
+                from backend.media.thumbnail_worker import queue_thumbnail_generation
+                queue_thumbnail_generation(media_path, is_image=True, thumbnail_cache_root=config.thumbnail_cache_root)
+            except Exception:
+                pass  # Non-critical, just serve original
             return send_file(media_path, mimetype='image/jpeg')
         else:
-            # For RAW and other formats, generate thumbnail
+            # For RAW and other formats, check for cached thumbnail first
+            thumbnail_path = preview_gen.generate_image_thumbnail(media_path)
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                return send_file(thumbnail_path, mimetype='image/jpeg')
+            # If no cached thumbnail, queue it for background generation
+            try:
+                from backend.media.thumbnail_worker import queue_thumbnail_generation
+                queue_thumbnail_generation(media_path, is_image=True, thumbnail_cache_root=config.thumbnail_cache_root)
+            except Exception:
+                pass  # Non-critical
+            # For now, try to generate synchronously as fallback (will be slow)
             thumbnail_path = preview_gen.generate_image_thumbnail(media_path)
             if not thumbnail_path or not os.path.exists(thumbnail_path):
                 return jsonify({'error': 'internal_error', 'message': 'Failed to generate thumbnail'}), 500
             return send_file(thumbnail_path, mimetype='image/jpeg')
     else:
+        # For videos, check for cached thumbnail first
+        thumbnail_path = preview_gen.generate_video_thumbnail(media_path)
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            return send_file(thumbnail_path, mimetype='image/jpeg')
+        # If no cached thumbnail, queue it for background generation
+        try:
+            from backend.media.thumbnail_worker import queue_thumbnail_generation
+            queue_thumbnail_generation(media_path, is_image=False, thumbnail_cache_root=config.thumbnail_cache_root)
+        except Exception:
+            pass  # Non-critical
+        # For now, try to generate synchronously as fallback (will be slow)
         thumbnail_path = preview_gen.generate_video_thumbnail(media_path)
         if not thumbnail_path or not os.path.exists(thumbnail_path):
             return jsonify({'error': 'internal_error', 'message': 'Failed to generate thumbnail'}), 500

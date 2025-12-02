@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getMedia, getThumbnailUrl, downloadMedia, uploadFiles } from '../services/api'
+import { useMediaCache } from '../contexts/MediaCacheContext'
 
 function MediaGrid() {
   const [media, setMedia] = useState([])
@@ -13,29 +14,76 @@ function MediaGrid() {
   const [uploadSuccess, setUploadSuccess] = useState('')
   const navigate = useNavigate()
   const { libraryId, folderId } = useParams()
+  const { getCachedMedia, setCachedMedia } = useMediaCache()
+  const isNavigatingBackRef = useRef(false)
 
   useEffect(() => {
-    loadMedia()
+    // Only load media if we have an auth token
+    const token = sessionStorage.getItem('authToken')
+    if (!token) return
+    
+    // Check if we're navigating back (cache exists)
+    const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
+    const cached = getCachedMedia(libraryId, folder, reviewStatus)
+    
+    if (cached && isNavigatingBackRef.current) {
+      // Use cached data immediately
+      setMedia(cached)
+      setLoading(false)
+      isNavigatingBackRef.current = false
+      
+      // Do background refresh to sync with server
+      loadMedia(true)
+    } else {
+      // Normal load
+      loadMedia()
+    }
   }, [libraryId, folderId, reviewStatus])
 
-  const loadMedia = async () => {
+  const loadMedia = async (background = false) => {
     if (!libraryId) return
     
-    setLoading(true)
+    if (!background) {
+      setLoading(true)
+    }
+    
     try {
       const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
       const response = await getMedia(libraryId, folder, reviewStatus)
       setMedia(response.data)
+      // Update cache
+      setCachedMedia(libraryId, folder, reviewStatus, response.data)
     } catch (err) {
       console.error('Failed to load media:', err)
     } finally {
-      setLoading(false)
+      if (!background) {
+        setLoading(false)
+      }
     }
   }
 
   const handleMediaClick = (mediaId) => {
-    navigate(`/media/${encodeURIComponent(mediaId)}`)
+    // Mark that we're navigating forward (not back)
+    isNavigatingBackRef.current = false
+    // Pass context to MediaDetail so it can update cache
+    const folder = folderId ? folderId.replace(`${libraryId}|`, '') : ''
+    navigate(`/media/${encodeURIComponent(mediaId)}`, {
+      state: {
+        libraryId,
+        folderId: folder,
+        reviewStatus
+      }
+    })
   }
+  
+  // Listen for browser back button
+  useEffect(() => {
+    const handlePopState = () => {
+      isNavigatingBackRef.current = true
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   if (loading) {
     return <div>Loading...</div>

@@ -9,14 +9,17 @@ import Admin from './components/Admin'
 import Logs from './components/Logs'
 import MFASetup from './components/MFASetup'
 import Upload from './components/Upload'
+import { MediaCacheProvider } from './contexts/MediaCacheContext'
 import { setAuthToken, setUnauthorizedHandler } from './services/api'
 import './App.css'
 
 function ProtectedRoute({ children }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [checkingAuth, setCheckingAuth] = useState(true)
   const navigate = useNavigate()
-
+  
+  // Check auth synchronously on first render to prevent children from mounting
+  const token = sessionStorage.getItem('authToken')
+  const [isAuthenticated, setIsAuthenticated] = useState(!!token)
+  
   useEffect(() => {
     // Set up unauthorized handler
     setUnauthorizedHandler(() => {
@@ -24,22 +27,17 @@ function ProtectedRoute({ children }) {
       navigate('/login')
     })
 
-    // Check if we have a token
-    const token = sessionStorage.getItem('authToken')
+    // Set token if we have one
     if (token) {
       setAuthToken(token)
       setIsAuthenticated(true)
     } else {
       setIsAuthenticated(false)
     }
-    setCheckingAuth(false)
-  }, [navigate])
+  }, [navigate, token])
 
-  if (checkingAuth) {
-    return <div>Loading...</div>
-  }
-
-  if (!isAuthenticated) {
+  // Redirect immediately if no token (synchronous check)
+  if (!token || !isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
@@ -63,8 +61,9 @@ function App() {
   }, [navigate])
 
   return (
-    <div className="App">
-      <Routes>
+    <MediaCacheProvider>
+      <div className="App">
+        <Routes>
         <Route path="/login" element={<Login onLogin={() => navigate('/')} />} />
         <Route 
           path="/" 
@@ -82,8 +81,9 @@ function App() {
               <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
               <Route path="/mfa-setup" element={<ProtectedRoute><MFASetup /></ProtectedRoute>} />
               <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
-      </Routes>
-    </div>
+        </Routes>
+      </div>
+    </MediaCacheProvider>
   )
 }
 

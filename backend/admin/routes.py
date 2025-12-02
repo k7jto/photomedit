@@ -66,6 +66,7 @@ def list_users():
         for db_user in db_users:
             users.append({
                 'username': db_user.username,
+                'email': db_user.email,
                 'role': db_user.role,
                 'mfaEnabled': bool(db_user.mfa_secret),
                 'createdAt': db_user.created_at.isoformat() if db_user.created_at else None,

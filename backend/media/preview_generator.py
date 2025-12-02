@@ -19,16 +19,23 @@ class PreviewGenerator:
         """Get cache path for a media file."""
         # Create hash-based cache key
         path_hash = hashlib.md5(media_path.encode()).hexdigest()
-        mtime = os.path.getmtime(media_path)
+        try:
+            mtime = os.path.getmtime(media_path)
+        except OSError:
+            # If file doesn't exist or can't access, use 0 as mtime
+            mtime = 0
         cache_key = f"{path_hash}_{int(mtime)}_{size}"
         
-        # Organize by date (YYYYMMDD)
-        from datetime import datetime
-        date_dir = datetime.now().strftime('%Y%m%d')
-        cache_dir = os.path.join(self.cache_root, date_dir)
+        # Use a single cache directory (not organized by date) for better persistence
+        cache_dir = os.path.join(self.cache_root, size)
         os.makedirs(cache_dir, exist_ok=True)
         
         return os.path.join(cache_dir, f"{cache_key}.jpg")
+    
+    def has_thumbnail(self, media_path: str) -> bool:
+        """Check if thumbnail exists in cache without generating it."""
+        cache_path = self._get_cache_path(media_path, 'thumb')
+        return os.path.exists(cache_path)
     
     def generate_image_thumbnail(self, image_path: str, max_size: Tuple[int, int] = (300, 300)) -> Optional[str]:
         """Generate thumbnail for an image."""
@@ -71,6 +78,11 @@ class PreviewGenerator:
             import logging
             logging.error(f"Thumbnail generation failed for {image_path}: {e}")
             return None
+    
+    def has_video_thumbnail(self, video_path: str) -> bool:
+        """Check if video thumbnail exists in cache without generating it."""
+        cache_path = self._get_cache_path(video_path, 'thumb')
+        return os.path.exists(cache_path)
     
     def generate_video_thumbnail(self, video_path: str, max_size: Tuple[int, int] = (300, 300)) -> Optional[str]:
         """Generate thumbnail for a video using ffmpeg."""

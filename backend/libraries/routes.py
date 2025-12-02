@@ -6,6 +6,9 @@ from backend.media.metadata_reader import MetadataReader
 from backend.media.preview_generator import PreviewGenerator
 from backend.security.sanitizer import PathSanitizer
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 libraries_bp = Blueprint('libraries', __name__)
@@ -38,12 +41,32 @@ def list_folders(library_id: str):
         return jsonify({'error': 'not_found', 'message': 'Library not found'}), 404
     
     parent = request.args.get('parent', '')
+    logger.info(f"List folders request: library={library_id}, parent='{parent}', rootPath={library['rootPath']}")
+    
+    # Verify root path exists and is accessible
+    if not os.path.exists(library['rootPath']):
+        logger.error(f"Library root path does not exist: {library['rootPath']}")
+        return jsonify({'error': 'internal_error', 'message': f'Library root path does not exist: {library["rootPath"]}'}), 500
+    
+    if not os.path.isdir(library['rootPath']):
+        logger.error(f"Library root path is not a directory: {library['rootPath']}")
+        return jsonify({'error': 'internal_error', 'message': f'Library root path is not a directory: {library["rootPath"]}'}), 500
+    
+    if not os.access(library['rootPath'], os.R_OK):
+        logger.error(f"Library root path is not readable: {library['rootPath']}")
+        return jsonify({'error': 'internal_error', 'message': f'Library root path is not readable: {library["rootPath"]}'}), 500
+    
+    logger.info(f"Scanning folders with parent='{parent}', rootPath={library['rootPath']}")
     folders = scan_folder(library['rootPath'], parent)
+    logger.info(f"Scan returned {len(folders)} folders")
+    if len(folders) > 0:
+        logger.info(f"Sample folder paths: {[f.get('relativePath', f.get('id', '')) for f in folders[:5]]}")
     
     # Add library ID prefix to folder IDs
     for folder in folders:
         folder['id'] = f"{library_id}|{folder['id']}"
     
+    logger.info(f"Returning {len(folders)} folders with IDs: {[f['id'] for f in folders[:5]]}")
     return jsonify(folders), 200
 
 
@@ -65,8 +88,14 @@ def list_media(library_id: str, folder_id: str):
     else:
         relative_path = folder_id.replace(f"{library_id}|", "", 1) if folder_id.startswith(f"{library_id}|") else folder_id
     
+    logger.info(f"List media request: library={library_id}, folder_id='{folder_id}', relative_path='{relative_path}'")
+    
     # Validate path
     is_valid, resolved_path, error = PathSanitizer.sanitize_path(library['rootPath'], relative_path)
+    if not is_valid:
+        logger.error(f"Invalid path for media listing: {relative_path} - {error}")
+    else:
+        logger.info(f"Resolved path for media: {resolved_path}")
     if not is_valid:
         return jsonify({'error': 'validation_error', 'message': error}), 400
     
@@ -104,15 +133,30 @@ def list_media(library_id: str, folder_id: str):
         image_exts = {'.jpg', '.jpeg', '.orf', '.nef', '.cr2', '.cr3', '.raf', '.arw', '.dng', '.tif', '.tiff'}
         is_image = ext in image_exts
         
-        # Generate thumbnail URL
-        thumbnail_path = None
-        if is_image:
-            thumbnail_path = preview_gen.generate_image_thumbnail(mf['path'])
-        else:
-            thumbnail_path = preview_gen.generate_video_thumbnail(mf['path'])
-        
-        # Always provide thumbnail URL for images
+        # Check if thumbnail exists (don't generate synchronously during listing)
+        # Queue for background generation if it doesn't exist
         media_id = f"{library_id}|{mf['relativePath']}"
+        has_thumb = False
+        if is_image:
+            has_thumb = preview_gen.has_thumbnail(mf['path'])
+            if not has_thumb:
+                # Queue for background generation
+                try:
+                    from backend.media.thumbnail_worker import queue_thumbnail_generation
+                    queue_thumbnail_generation(mf['path'], is_image=True, thumbnail_cache_root=config.thumbnail_cache_root)
+                except Exception as e:
+                    logger.debug(f"Failed to queue thumbnail for {mf['path']}: {e}")
+        else:
+            has_thumb = preview_gen.has_thumbnail(mf['path'])
+            if not has_thumb:
+                # Queue for background generation
+                try:
+                    from backend.media.thumbnail_worker import queue_thumbnail_generation
+                    queue_thumbnail_generation(mf['path'], is_image=False, thumbnail_cache_root=config.thumbnail_cache_root)
+                except Exception as e:
+                    logger.debug(f"Failed to queue thumbnail for {mf['path']}: {e}")
+        
+        # Always provide thumbnail URL (will be generated on-demand if not cached)
         thumbnail_url = f"/api/media/{media_id}/thumbnail"
         
         # Build media ID
@@ -130,6 +174,24 @@ def list_media(library_id: str, folder_id: str):
             'hasPeople': bool(metadata.get('people')),
             'reviewStatus': file_review_status
         })
+    
+    # Sort media list: by eventDate if available, otherwise by filename
+    def sort_key(item):
+        # Primary sort: eventDate (newest first)
+        event_date = item.get('eventDate')
+        if event_date:
+            try:
+                from datetime import datetime
+                # Parse ISO format date
+                dt = datetime.fromisoformat(event_date.replace('Z', '+00:00'))
+                # Return negative timestamp for descending order (newest first)
+                return (-dt.timestamp(), item['filename'].lower())
+            except Exception:
+                pass
+        # Fallback: sort by filename (case-insensitive)
+        return (float('inf'), item['filename'].lower())
+    
+    media_list.sort(key=sort_key)
     
     return jsonify(media_list), 200
 

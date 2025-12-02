@@ -35,12 +35,14 @@ services:
       - DB_NAME=photomedit
       - DB_USER=photomedit
       - DB_PASSWORD=photomedit_password_change_me
+      - PUID=1024
+      - PGID=100
     depends_on:
       photomedit-db:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4750/api/libraries').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4750/health').read()"]
       interval: 30s
       timeout: 10s
       retries: 3

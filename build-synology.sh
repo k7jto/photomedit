@@ -4,6 +4,13 @@
 
 set -e
 
+# Parse command line arguments
+NO_CACHE=""
+if [[ "$1" == "--no-cache" ]] || [[ "$1" == "-n" ]]; then
+    NO_CACHE="--no-cache"
+    echo "🔨 Building with --no-cache flag (no cache will be used)"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build-synology"
 
@@ -13,9 +20,10 @@ echo ""
 # Create build directory
 mkdir -p "${BUILD_DIR}"
 
-# Build Docker image
-echo "🔨 Building Docker image..."
-docker build -t photomedit:latest .
+      # Build Docker image with PUID/PGID for Synology
+      # Synology typically uses UID 1024 for first user, GID 100 for users group
+      echo "🔨 Building Docker image with PUID=1024, PGID=100 (Synology defaults)..."
+      docker build ${NO_CACHE} --build-arg PUID=1024 --build-arg PGID=100 -t photomedit:latest .
 
 # Save Docker image to tar (for Synology Container Manager import)
 # Note: Synology Container Manager can import .tar.gz files directly
@@ -26,6 +34,15 @@ echo "   Compressed size: $(du -h "${BUILD_DIR}/photomedit-image.tar.gz" | cut -
 # Copy configuration files to build directory
 echo "📋 Copying configuration files..."
 cp config.yaml "${BUILD_DIR}/"
+
+# Verify config.yaml has correct path for container
+if grep -q "rootPath: \"/volume1/" "${BUILD_DIR}/config.yaml"; then
+    echo "⚠️  WARNING: config.yaml uses /volume1/ path directly!"
+    echo "⚠️  This will NOT work inside the container."
+    echo "⚠️  The config should use '/data/pictures' (the mount point inside container)"
+    echo "⚠️  Docker mount maps: /volume1/Memories (host) -> /data/pictures (container)"
+fi
+
 cp docker-compose.yml "${BUILD_DIR}/docker-compose.yml"
 
 # Create Synology-specific docker-compose file
@@ -68,12 +85,14 @@ services:
       - DB_NAME=photomedit
       - DB_USER=photomedit
       - DB_PASSWORD=photomedit_password_change_me
+      - PUID=1024
+      - PGID=100
     depends_on:
       photomedit-db:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4750/api/libraries').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4750/health').read()"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -91,10 +110,20 @@ echo "  - config.yaml (application configuration)"
 echo "  - docker-compose.synology.yml (Synology docker-compose file)"
 echo "  - docker-compose.yml (original docker-compose file)"
 echo ""
-echo "📦 To deploy on Synology:"
-echo "  1. Import photomedit-image.tar.gz in Container Manager"
-echo "  2. Copy config.yaml and docker-compose.synology.yml to your Synology"
-echo "  3. Edit config.yaml with your settings"
-echo "  4. Run: docker-compose -f docker-compose.synology.yml up -d"
-echo ""
+      echo "📦 To deploy on Synology:"
+      echo "  1. Import photomedit-image.tar.gz in Container Manager"
+      echo "  2. Copy config.yaml and docker-compose.synology.yml to your Synology"
+      echo "  3. Edit config.yaml with your settings"
+      echo "  4. Verify PUID/PGID in docker-compose.synology.yml match your Synology user:"
+      echo "     - Check your user UID: id -u <your-username>"
+      echo "     - Check your group GID: id -g <your-username>"
+      echo "     - Default Synology: PUID=1024, PGID=100"
+      echo "     - PhotoPrism typically uses: PUID=1024, PGID=100"
+      echo "  5. Run: docker-compose -f docker-compose.synology.yml up -d"
+      echo ""
+      echo "🔐 Permissions:"
+      echo "  - Ensure your Synology user has Read/Write access to /volume1/Memories"
+      echo "  - In DSM: Control Panel > Shared Folder > Memories > Edit > Permissions"
+      echo "  - Grant your user Read/Write access"
+      echo ""
 echo "Image size: $(du -h "${BUILD_DIR}/photomedit-image.tar.gz" | cut -f1)"

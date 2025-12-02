@@ -41,6 +41,12 @@ def sanitize_upload_name(name: str) -> str:
 
 def get_unique_filename(directory: str, filename: str) -> str:
     """Get a unique filename, appending numeric suffix if needed."""
+    # Ensure directory exists
+    if not os.path.exists(directory):
+        raise ValueError(f"Directory does not exist: {directory}")
+    if not os.path.isdir(directory):
+        raise ValueError(f"Path is not a directory: {directory}")
+    
     base_path = os.path.join(directory, filename)
     if not os.path.exists(base_path):
         return filename
@@ -130,6 +136,18 @@ def upload_files():
             if not is_valid:
                 return jsonify({'error': 'validation_error', 'message': error}), 400
             
+            # Ensure the target folder exists
+            if not os.path.exists(resolved_path):
+                try:
+                    if not create_directory_with_permissions(resolved_path):
+                        logger.error(f"Failed to create target folder: {resolved_path}")
+                        return jsonify({'error': 'internal_error', 'message': 'Failed to create target folder'}), 500
+                except Exception as e:
+                    logger.error(f"Failed to create target folder: {e}", exc_info=True)
+                    return jsonify({'error': 'internal_error', 'message': 'Failed to create target folder'}), 500
+            elif not os.path.isdir(resolved_path):
+                return jsonify({'error': 'validation_error', 'message': 'Target path exists but is not a directory'}), 400
+            
             batch_path = resolved_path
             target_root = library['rootPath']
         else:
@@ -144,17 +162,48 @@ def upload_files():
             sanitized_name = sanitize_upload_name(upload_name)
             new_folder_path = os.path.join(library['rootPath'], sanitized_name)
             
+            # Verify library root path exists and is accessible
+            logger.info(f"Library root path: {library['rootPath']}")
+            logger.info(f"Library root exists: {os.path.exists(library['rootPath'])}")
+            logger.info(f"Library root is dir: {os.path.isdir(library['rootPath']) if os.path.exists(library['rootPath']) else 'N/A'}")
+            logger.info(f"Library root readable: {os.access(library['rootPath'], os.R_OK) if os.path.exists(library['rootPath']) else 'N/A'}")
+            logger.info(f"Library root writable: {os.access(library['rootPath'], os.W_OK) if os.path.exists(library['rootPath']) else 'N/A'}")
+            
+            # Check if it's a mount point
+            try:
+                import stat
+                root_stat = os.stat(library['rootPath'])
+                logger.info(f"Library root device: {root_stat.st_dev}")
+                # Check parent to see if it's on a different device (mount point)
+                parent_path = os.path.dirname(library['rootPath'])
+                if os.path.exists(parent_path):
+                    parent_stat = os.stat(parent_path)
+                    is_mount = (root_stat.st_dev != parent_stat.st_dev)
+                    logger.info(f"Library root appears to be mount point: {is_mount}")
+            except Exception as e:
+                logger.warning(f"Could not check mount status: {e}")
+            
             logger.info(f"Creating upload folder: {new_folder_path} (library root: {library['rootPath']})")
             logger.info(f"Sanitized upload name: '{upload_name}' -> '{sanitized_name}'")
             
             try:
-                if not create_directory_with_permissions(new_folder_path, library['rootPath']):
+                if not create_directory_with_permissions(new_folder_path):
                     logger.error(f"Failed to create folder in library root: {new_folder_path}")
                     return jsonify({'error': 'internal_error', 'message': 'Failed to create folder'}), 500
                 logger.info(f"Successfully created folder: {new_folder_path}")
-                # Verify folder exists
+                # Verify folder exists and get its actual location
                 if os.path.exists(new_folder_path):
+                    real_path = os.path.realpath(new_folder_path)
                     logger.info(f"Verified folder exists: {new_folder_path}")
+                    logger.info(f"Real path (resolved symlinks): {real_path}")
+                    # Check if it's actually on the mounted volume
+                    try:
+                        folder_stat = os.stat(new_folder_path)
+                        root_stat = os.stat(library['rootPath'])
+                        same_device = (folder_stat.st_dev == root_stat.st_dev)
+                        logger.info(f"Folder is on same device as root: {same_device} (folder dev={folder_stat.st_dev}, root dev={root_stat.st_dev})")
+                    except Exception as e:
+                        logger.warning(f"Could not verify device: {e}")
                 else:
                     logger.error(f"Folder creation reported success but folder does not exist: {new_folder_path}")
             except Exception as e:
@@ -185,6 +234,15 @@ def upload_files():
         except Exception as e:
             logger.error(f"Failed to create batch directory: {e}")
             return jsonify({'error': 'internal_error', 'message': 'Failed to create upload directory'}), 500
+    
+    # Verify batch_path exists and is a directory before processing files
+    if not os.path.exists(batch_path):
+        logger.error(f"Batch path does not exist: {batch_path}")
+        return jsonify({'error': 'internal_error', 'message': 'Upload directory does not exist'}), 500
+    
+    if not os.path.isdir(batch_path):
+        logger.error(f"Batch path is not a directory: {batch_path}")
+        return jsonify({'error': 'internal_error', 'message': 'Upload path is not a directory'}), 500
     
     # Get files
     if 'files' not in request.files:
@@ -300,11 +358,56 @@ def upload_files():
             # Atomically rename
             os.rename(temp_path, final_path)
             logger.info(f"Successfully saved file '{original_name}' to '{final_path}'")
-            # Verify file exists
+            
+            # Detailed diagnostics for saved file
             if os.path.exists(final_path):
-                logger.info(f"Verified file exists: {final_path} (size: {os.path.getsize(final_path)} bytes)")
+                file_size_actual = os.path.getsize(final_path)
+                logger.info(f"✓ Verified file exists: {final_path} (size: {file_size_actual} bytes)")
+                
+                # Check device ID and mount status
+                try:
+                    file_stat = os.stat(final_path)
+                    real_path = os.path.realpath(final_path)
+                    logger.info(f"✓ File device ID: {file_stat.st_dev}, inode: {file_stat.st_ino}")
+                    logger.info(f"✓ File real path (resolved): {real_path}")
+                    
+                    # If uploading to library, check if it's on the same device as library root
+                    if library_id and library:
+                        root_stat = os.stat(library['rootPath'])
+                        same_device = (file_stat.st_dev == root_stat.st_dev)
+                        logger.info(f"✓ File is on same device as library root: {same_device}")
+                        logger.info(f"  - File device: {file_stat.st_dev}, Root device: {root_stat.st_dev}")
+                        if not same_device:
+                            logger.error(f"✗ WARNING: File is NOT on the same device as library root!")
+                            logger.error(f"✗ This means the file is being written to a different filesystem!")
+                            logger.error(f"✗ Library root: {library['rootPath']} (device {root_stat.st_dev})")
+                            logger.error(f"✗ File location: {final_path} (device {file_stat.st_dev})")
+                    
+                    # Check parent directory device
+                    parent_dir = os.path.dirname(final_path)
+                    if os.path.exists(parent_dir):
+                        parent_stat = os.stat(parent_dir)
+                        is_mount = (file_stat.st_dev != parent_stat.st_dev)
+                        logger.info(f"✓ Parent directory device: {parent_stat.st_dev}, is mount point: {is_mount}")
+                except Exception as e:
+                    logger.warning(f"Could not get file diagnostics: {e}")
             else:
-                logger.error(f"File save reported success but file does not exist: {final_path}")
+                logger.error(f"✗ File save reported success but file does not exist: {final_path}")
+            
+            # Queue thumbnail generation in background
+            try:
+                from backend.media.thumbnail_worker import queue_thumbnail_generation
+                from pathlib import Path
+                config = current_app.config.get('PHOTOMEDIT_CONFIG')
+                if config:
+                    # Determine if it's an image or video
+                    ext = Path(final_path).suffix.lower()
+                    image_exts = {'.jpg', '.jpeg', '.orf', '.nef', '.cr2', '.cr3', '.raf', '.arw', '.dng', '.tif', '.tiff'}
+                    is_image = ext in image_exts
+                    queue_thumbnail_generation(final_path, is_image=is_image, thumbnail_cache_root=config.thumbnail_cache_root)
+                    logger.debug(f"Queued thumbnail generation for {final_path}")
+            except Exception as e:
+                logger.warning(f"Failed to queue thumbnail generation: {e}")
             
             # Post-upload: import metadata
             try:

@@ -87,10 +87,10 @@ function Admin() {
   const startEdit = (user) => {
     setEditingUser(user)
     setFormData({
-      username: user.username || user.get('username'),
-      email: user.email || user.get('email') || '',
+      username: user.username || '',
+      email: user.email || '',
       password: '',
-      role: user.role || (user.isAdmin || user.get('isAdmin', false) ? 'admin' : 'user')
+      role: user.role || (user.isAdmin ? 'admin' : 'user')
     })
     setShowCreateForm(false)
   }
@@ -253,10 +253,10 @@ function Admin() {
             </thead>
             <tbody>
               {users.map(user => (
-                <tr key={user.username || user.get('username')}>
-                  <td>{user.username || user.get('username')}</td>
-                  <td>{user.email || user.get('email') || ''}</td>
-                  <td>{user.role || (user.isAdmin || user.get('isAdmin', false) ? 'admin' : 'user')}</td>
+                <tr key={user.username}>
+                  <td>{user.username}</td>
+                  <td>{user.email || ''}</td>
+                  <td>{user.role || (user.isAdmin ? 'admin' : 'user')}</td>
                   <td>{user.mfaEnabled ? '✓' : ''}</td>
                   <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</td>
                   <td>
@@ -273,9 +273,9 @@ function Admin() {
                           <button 
                             className="pm-button pm-button-ghost"
                             onClick={async () => {
-                              if (window.confirm(`Disable MFA for "${user.username || user.get('username')}"?`)) {
+                              if (window.confirm(`Disable MFA for "${user.username}"?`)) {
                                 try {
-                                  await fetch(`/api/admin/users/${user.username || user.get('username')}/disable-mfa`, {
+                                  await fetch(`/api/admin/users/${user.username}/disable-mfa`, {
                                     method: 'POST',
                                     headers: {
                                       'Authorization': `Bearer ${sessionStorage.getItem('authToken')}`,
@@ -296,7 +296,7 @@ function Admin() {
                         )}
                         <button 
                           className="pm-button pm-button-ghost"
-                          onClick={() => handleDelete(user.username || user.get('username'))}
+                          onClick={() => handleDelete(user.username)}
                           style={{color: 'var(--pm-error)'}}
                         >
                           Delete
