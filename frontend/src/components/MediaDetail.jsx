@@ -13,6 +13,8 @@ function MediaDetail() {
   const [success, setSuccess] = useState('')
   const [formData, setFormData] = useState({})
   const [markReviewed, setMarkReviewed] = useState(true)
+  const [showCorrectionDialog, setShowCorrectionDialog] = useState(false)
+  const [correctionNotes, setCorrectionNotes] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
   const { mediaId } = useParams()
@@ -86,8 +88,11 @@ function MediaDetail() {
         notes: metadata.notes || '',
         people: (metadata.people || []).join(', '),
         locationName: metadata.locationName || '',
-        reviewStatus: metadata.reviewStatus || 'unreviewed'
+        reviewStatus: metadata.reviewStatus || 'unreviewed',
+        correctionNeeded: metadata.correctionNeeded || false,
+        correctionNotes: metadata.correctionNotes || ''
       })
+      setCorrectionNotes(metadata.correctionNotes || '')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load media')
     } finally {
@@ -202,6 +207,62 @@ function MediaDetail() {
       setTimeout(() => setError(''), 3000)
     } finally {
       setNavigating(false)
+    }
+  }
+
+  const handleFlagForCorrection = async () => {
+    if (!media) return
+    
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    
+    try {
+      const updateData = {
+        correctionNeeded: true,
+        correctionNotes: correctionNotes
+      }
+      await updateMedia(decodeURIComponent(mediaId), updateData)
+      setFormData(prev => ({ 
+        ...prev, 
+        correctionNeeded: true,
+        correctionNotes: correctionNotes
+      }))
+      setSuccess('Image flagged for correction')
+      setShowCorrectionDialog(false)
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to flag for correction')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleClearCorrectionFlag = async () => {
+    if (!media) return
+    
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    
+    try {
+      const updateData = {
+        correctionNeeded: false,
+        correctionNotes: ''
+      }
+      await updateMedia(decodeURIComponent(mediaId), updateData)
+      setFormData(prev => ({ 
+        ...prev, 
+        correctionNeeded: false,
+        correctionNotes: ''
+      }))
+      setCorrectionNotes('')
+      setSuccess('Correction flag cleared')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to clear correction flag')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -402,9 +463,52 @@ function MediaDetail() {
             </div>
           </div>
           
-          <div style={{marginTop: '1rem', display: 'flex', gap: '0.5rem'}}>
+          {/* Correction Flag Indicator */}
+          {formData.correctionNeeded && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              background: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.4)',
+              borderRadius: 'var(--pm-radius-sm)',
+              color: '#fbbf24'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600', marginBottom: '0.25rem'}}>
+                <span>⚠️</span> Flagged for Correction
+              </div>
+              {formData.correctionNotes && (
+                <div style={{fontSize: '0.875rem', color: 'var(--pm-text-muted)', marginTop: '0.25rem'}}>
+                  {formData.correctionNotes}
+                </div>
+              )}
+              <button
+                className="pm-button pm-button-ghost"
+                onClick={handleClearCorrectionFlag}
+                disabled={saving}
+                style={{marginTop: '0.5rem', fontSize: '0.75rem', padding: '0.25rem 0.5rem'}}
+              >
+                Clear Flag
+              </button>
+            </div>
+          )}
+          
+          <div style={{marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
             <button className="pm-button pm-button-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving...' : 'Save (S)'}
+            </button>
+            <button 
+              className="pm-button pm-button-ghost" 
+              onClick={() => {
+                setCorrectionNotes(formData.correctionNotes || '')
+                setShowCorrectionDialog(true)
+              }}
+              disabled={saving}
+              style={{
+                color: formData.correctionNeeded ? '#fbbf24' : 'var(--pm-text-muted)',
+                borderColor: formData.correctionNeeded ? '#fbbf24' : 'var(--pm-border)'
+              }}
+            >
+              {formData.correctionNeeded ? '⚠️ Edit Flag' : '🚩 Flag for Correction'}
             </button>
             <button 
               className="pm-button pm-button-ghost" 
@@ -415,6 +519,73 @@ function MediaDetail() {
               {rejecting ? 'Moving...' : 'Reject'}
             </button>
           </div>
+          
+          {/* Correction Dialog */}
+          {showCorrectionDialog && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }} onClick={() => setShowCorrectionDialog(false)}>
+              <div style={{
+                background: 'var(--pm-surface)',
+                padding: '1.5rem',
+                borderRadius: 'var(--pm-radius-md)',
+                border: '1px solid var(--pm-border)',
+                maxWidth: '500px',
+                width: '90%',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)'
+              }} onClick={e => e.stopPropagation()}>
+                <h3 style={{margin: '0 0 1rem 0', color: 'var(--pm-text)'}}>
+                  🚩 Flag for Correction
+                </h3>
+                <p style={{color: 'var(--pm-text-muted)', fontSize: '0.875rem', marginBottom: '1rem'}}>
+                  Describe what corrections are needed for this image:
+                </p>
+                {error && (
+                  <div style={{color: 'var(--pm-error)', padding: '0.5rem', background: 'rgba(249, 115, 115, 0.1)', borderRadius: 'var(--pm-radius-sm)', marginBottom: '1rem', fontSize: '0.875rem'}}>
+                    {error}
+                  </div>
+                )}
+                <textarea
+                  className="pm-textarea"
+                  value={correctionNotes}
+                  onChange={(e) => setCorrectionNotes(e.target.value)}
+                  placeholder="e.g., Needs dust removal, color correction, cropping adjustment..."
+                  style={{minHeight: '100px', marginBottom: '1rem'}}
+                  autoFocus
+                />
+                <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'flex-end'}}>
+                  <button 
+                    className="pm-button pm-button-ghost" 
+                    onClick={() => {
+                      setShowCorrectionDialog(false)
+                      setError('')
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="pm-button pm-button-primary" 
+                    onClick={async () => {
+                      await handleFlagForCorrection()
+                    }}
+                    disabled={saving}
+                    style={{background: '#fbbf24', borderColor: '#fbbf24', color: '#000'}}
+                  >
+                    {saving ? 'Saving...' : 'Flag Image'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

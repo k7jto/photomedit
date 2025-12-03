@@ -196,6 +196,9 @@ class MetadataWriter:
                 tags['EXIF:GPSLatitudeRef'] = 'N' if coords['lat'] >= 0 else 'S'
                 tags['EXIF:GPSLongitudeRef'] = 'E' if coords['lon'] >= 0 else 'W'
         
+        # Note: Correction flags are stored in corrections.csv, not in image metadata
+        # This keeps workflow data separate from archival metadata
+        
         # Review status - use XMP:UserComment with PhotoMedit prefix
         # Only use UserComment if it's different from Notes (to avoid overwriting Notes stored in UserComment)
         # Format: "PhotoMedit:reviewed" or "PhotoMedit:unreviewed"

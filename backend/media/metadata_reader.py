@@ -166,5 +166,8 @@ class MetadataReader:
         
         metadata['reviewStatus'] = review_status
         
+        # Note: Correction flags are stored in corrections.csv, not in image metadata
+        # They are loaded separately in the media routes
+        
         return metadata
 

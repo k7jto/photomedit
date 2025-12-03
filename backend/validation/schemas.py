@@ -22,6 +22,8 @@ class MediaUpdateRequest(BaseModel):
     locationName: Optional[str] = None
     locationCoords: Optional[dict] = None
     reviewStatus: Optional[Literal['unreviewed', 'reviewed']] = None
+    correctionNeeded: Optional[bool] = None
+    correctionNotes: Optional[str] = None
     
     @field_validator('locationCoords')
     @classmethod

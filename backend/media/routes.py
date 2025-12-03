@@ -7,6 +7,7 @@ from backend.media.preview_generator import PreviewGenerator
 from backend.media.navigation import MediaNavigator
 from backend.security.sanitizer import PathSanitizer
 from backend.utils.geocoding import GeocodingService
+from backend.utils.corrections import get_correction, add_correction, clear_correction
 from backend.validation.schemas import MediaUpdateRequest, NavigateQuery
 from pydantic import ValidationError
 import os
@@ -68,6 +69,20 @@ def get_media(media_id: str):
     preview_gen = PreviewGenerator(config.thumbnail_cache_root)
     preview_path = preview_gen.generate_preview(media_path, is_image)
     preview_url = f"/api/media/{media_id}/preview" if preview_path else None
+    
+    # Get correction data from CSV file (not from image metadata)
+    folder_path = os.path.dirname(media_path)
+    filename = os.path.basename(media_path)
+    correction_data = get_correction(folder_path, filename)
+    
+    if correction_data:
+        logical_metadata['correctionNeeded'] = True
+        logical_metadata['correctionNotes'] = correction_data.get('correctionNotes', '')
+        logical_metadata['correctionFlaggedBy'] = correction_data.get('username', '')
+        logical_metadata['correctionFlaggedAt'] = correction_data.get('flaggedAt', '')
+    else:
+        logical_metadata['correctionNeeded'] = False
+        logical_metadata['correctionNotes'] = ''
     
     return jsonify({
         'libraryId': library_id,
@@ -231,6 +246,30 @@ def update_media(media_id: str):
     
     # Convert to dict, excluding None values
     metadata = update_data.model_dump(exclude_none=True)
+    
+    # Handle correction flag separately (stored in CSV, not in image metadata)
+    folder_path = os.path.dirname(media_path)
+    filename = os.path.basename(media_path)
+    
+    if 'correctionNeeded' in metadata:
+        correction_needed = metadata.pop('correctionNeeded')
+        correction_notes = metadata.pop('correctionNotes', '') if 'correctionNotes' in metadata else ''
+        
+        if correction_needed:
+            # Get current user from request context
+            username = getattr(request, 'current_user', 'unknown')
+            if not add_correction(folder_path, filename, username, correction_notes):
+                return jsonify({'error': 'correction_write_failed', 'message': 'Failed to save correction flag'}), 500
+        else:
+            # Clear the correction flag
+            if not clear_correction(folder_path, filename):
+                return jsonify({'error': 'correction_write_failed', 'message': 'Failed to clear correction flag'}), 500
+    elif 'correctionNotes' in metadata:
+        # If only correctionNotes provided (without correctionNeeded), treat as update
+        correction_notes = metadata.pop('correctionNotes')
+        username = getattr(request, 'current_user', 'unknown')
+        if not add_correction(folder_path, filename, username, correction_notes):
+            return jsonify({'error': 'correction_write_failed', 'message': 'Failed to save correction flag'}), 500
     
     # Check if we should mark as reviewed when saving
     mark_reviewed = request.get_json().get('markReviewed', False) if request.get_json() else False
