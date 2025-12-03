@@ -227,11 +227,13 @@ def create_app(config_path: str = None):
     @app.before_request
     def check_auth():
         """Check JWT authentication for protected routes."""
-        # Skip auth check for login, password reset, static files, favicon, health check, and frontend routes
-        skip_endpoints = ['auth.login', 'auth.forgot_password', 'auth.reset_password', 'static', 'serve_frontend', 'favicon', 'health_check', 'diagnostic_paths']
-        # Skip auth for non-API routes (frontend routes) - these will be handled by serve_frontend
-        is_frontend_route = not request.path.startswith('/api/') and request.endpoint == 'serve_frontend'
-        if request.endpoint in skip_endpoints or '/forgot-password' in request.path or '/reset-password' in request.path or request.path == '/favicon.ico' or request.path == '/health' or '/diagnostic/' in request.path or is_frontend_route:
+        # Skip auth for non-API routes (frontend/static files) - let 404 handler serve them
+        if not request.path.startswith('/api/'):
+            return
+        
+        # Skip auth check for login, password reset, and diagnostic endpoints
+        skip_endpoints = ['auth.login', 'auth.forgot_password', 'auth.reset_password', 'diagnostic_paths']
+        if request.endpoint in skip_endpoints or '/forgot-password' in request.path or '/reset-password' in request.path or '/diagnostic/' in request.path:
             return
         
         if not config.auth_enabled:
