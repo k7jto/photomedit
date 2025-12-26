@@ -329,17 +329,32 @@ function MediaGrid() {
               className="pm-media-card"
               onClick={() => handleMediaClick(item.id)}
             >
-              <img 
-                src={getThumbnailUrl(item.id)} 
-                alt={item.filename} 
-                className="pm-media-thumb"
-                onError={(e) => {
-                  e.target.style.display = 'none'
-                  e.target.nextSibling.style.display = 'flex'
-                }}
-              />
-              <div className="media-placeholder" style={{display: 'none', width: '100%', aspectRatio: '4/3', alignItems: 'center', justifyContent: 'center', background: 'var(--pm-surface)', color: 'var(--pm-text-muted)'}}>
-                No thumbnail
+              <div className="pm-media-thumb-wrap">
+                <img 
+                  src={getThumbnailUrl(item.id)} 
+                  alt={item.filename} 
+                  className="pm-media-thumb"
+                  onError={(e) => {
+                    // Hide the broken image and show the placeholder inside the wrapper
+                    e.currentTarget.style.display = 'none'
+                    const placeholder = e.currentTarget.parentElement?.querySelector('.media-placeholder')
+                    if (placeholder) placeholder.style.display = 'flex'
+                  }}
+                />
+                <div
+                  className="media-placeholder"
+                  style={{
+                    display: 'none',
+                    width: '100%',
+                    height: '100%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'var(--pm-surface)',
+                    color: 'var(--pm-text-muted)'
+                  }}
+                >
+                  No thumbnail
+                </div>
               </div>
               {item.mediaType === 'video' && (
                 <div className="pm-media-type-badge">VIDEO</div>
@@ -367,4 +382,3 @@ function MediaGrid() {
 }
 
 export default MediaGrid
-

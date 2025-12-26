@@ -1,10 +1,11 @@
 # PhotoMedit Configuration
+# NOTE: Edit this file with a text editor, NOT Container Manager's YAML editor
 
 # Server settings
 server:
   port: 4750
   host: "0.0.0.0"
-  jwtSecret: "change-me-in-production-use-strong-random-secret"
+  jwtSecret: "38043780-e550-4aaa-a658-7f04fe421d6e"
 
 # Authentication
 auth:
@@ -13,14 +14,14 @@ auth:
   # Other users are stored in MariaDB database
   adminUser:
     username: "admin"
-    email: "admin@domain.com"  # Admin email for password resets and notifications
-    passwordHash: "$2b$12$1aCOPTBsVc.cjOJnQqhcuue84mGVEu1JKS4VrMXasJwjhmZM8eK5G"  # password: admin
+    email: "john@overbaugh.com"  # Admin email for password resets and notifications
+    passwordHash: "$2b$12$k4ApRNx8TgjQSRRX.IsMtecdfrh/woGTJTypmu1pbum6/Ib1oM4QK"  # password: admin
     isAdmin: true
 
 # Libraries (NAS directories)
 libraries:
-  - id: "library1"
-    name: "My Pictures"
+  - id: "Projects"
+    name: "My Projects"
     rootPath: "/data/pictures"
 
 # Thumbnail cache
@@ -51,7 +52,7 @@ geocoding:
 dam:
   enabled: true
   name: "Immich"  # Display name for the DAM
-  url: "http://localhost:2283"  # URL to access DAM web interface (for linking)
+  url: "https://immich-dev.johnoverbaugh.com"  # URL to access DAM web interface (for linking)
   folderPath: "/data/dam"  # Where to copy published files
 
 # Logging

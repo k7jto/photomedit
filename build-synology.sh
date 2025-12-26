@@ -28,9 +28,9 @@ echo ""
 # Create build directory
 mkdir -p "${BUILD_DIR}"
 
-# Build Docker image
+# Build Docker image from the photomedit directory (where the updated code lives)
 echo "🔨 Building Docker image (PUID=1024, PGID=100 for Synology)..."
-docker build ${NO_CACHE} --build-arg PUID=1024 --build-arg PGID=100 -t photomedit:latest .
+docker build ${NO_CACHE} --build-arg PUID=1024 --build-arg PGID=100 -t photomedit:latest "${SCRIPT_DIR}"
 
 # Save Docker image
 echo ""

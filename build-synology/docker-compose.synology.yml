@@ -25,9 +25,10 @@ services:
       - "4750:4750"
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - /volume1/Memories:/data/pictures:rw
-      - ./data/thumbnails:/data/thumbnails:rw
-      - ./data/uploads:/data/uploads:rw
+      - /volume1/photography/projects:/data/pictures:rw
+      - .volume1/photography/projects/thumbnails:/data/thumbnails:rw
+      - /volume1/photography/projects/uploads:/data/uploads:rw
+      - /volume1/photography/projects/immich:/data/dam:rw
     environment:
       - PHOTOMEDIT_CONFIG=/app/config.yaml
       - DB_HOST=photomedit-db
