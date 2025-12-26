@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { getMediaDetail, updateMedia, rejectMedia, navigateMedia, getPreviewUrl, getThumbnailUrl } from '../services/api'
+import { getMediaDetail, updateMedia, rejectMedia, navigateMedia, getPreviewUrl, getThumbnailUrl, getPublishConfig, publishMedia } from '../services/api'
 import { useMediaCache } from '../contexts/MediaCacheContext'
 
 function MediaDetail() {
@@ -15,6 +15,8 @@ function MediaDetail() {
   const [markReviewed, setMarkReviewed] = useState(true)
   const [showCorrectionDialog, setShowCorrectionDialog] = useState(false)
   const [correctionNotes, setCorrectionNotes] = useState('')
+  const [publishing, setPublishing] = useState(false)
+  const [damConfig, setDamConfig] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
   const { mediaId } = useParams()
@@ -49,6 +51,16 @@ function MediaDetail() {
   useEffect(() => {
     loadMedia()
   }, [mediaId])
+
+  useEffect(() => {
+    // Load DAM config once
+    getPublishConfig().then(response => {
+      setDamConfig(response.data)
+    }).catch(() => {
+      // DAM not configured, that's fine
+      setDamConfig({ enabled: false })
+    })
+  }, [])
 
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -266,6 +278,39 @@ function MediaDetail() {
     }
   }
 
+  const handlePublish = async () => {
+    if (!media || !damConfig?.enabled) return
+    
+    if (!window.confirm(`Publish this image to ${damConfig.name}? The file will be copied to the DAM folder.`)) {
+      return
+    }
+    
+    setPublishing(true)
+    setError('')
+    setSuccess('')
+    
+    try {
+      const response = await publishMedia([decodeURIComponent(mediaId)])
+      if (response.data.published > 0) {
+        setFormData(prev => ({ 
+          ...prev, 
+          isPublished: true,
+          publishedTo: damConfig.name
+        }))
+        setSuccess(`Published to ${damConfig.name}`)
+        setTimeout(() => setSuccess(''), 3000)
+      } else if (response.data.results?.[0]?.message) {
+        setError(response.data.results[0].message)
+      } else {
+        setError('Failed to publish')
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to publish')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   if (loading) {
     return <div>Loading...</div>
   }
@@ -463,6 +508,27 @@ function MediaDetail() {
             </div>
           </div>
           
+          {/* Published Indicator */}
+          {formData.isPublished && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              borderRadius: 'var(--pm-radius-sm)',
+              color: '#10b981'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600'}}>
+                <span>✓</span> Published to {formData.publishedTo || 'DAM'}
+              </div>
+              {formData.publishedAt && (
+                <div style={{fontSize: '0.75rem', color: 'var(--pm-text-muted)', marginTop: '0.25rem'}}>
+                  {new Date(formData.publishedAt).toLocaleString()}
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Correction Flag Indicator */}
           {formData.correctionNeeded && (
             <div style={{
@@ -518,6 +584,20 @@ function MediaDetail() {
             >
               {rejecting ? 'Moving...' : 'Reject'}
             </button>
+            {damConfig?.enabled && !formData.isPublished && (
+              <button 
+                className="pm-button pm-button-ghost" 
+                onClick={handlePublish}
+                disabled={publishing || formData.correctionNeeded}
+                style={{
+                  color: formData.correctionNeeded ? 'var(--pm-text-muted)' : '#10b981',
+                  borderColor: formData.correctionNeeded ? 'var(--pm-border)' : '#10b981'
+                }}
+                title={formData.correctionNeeded ? 'Clear correction flag before publishing' : `Publish to ${damConfig.name}`}
+              >
+                {publishing ? 'Publishing...' : `📤 Publish to ${damConfig.name}`}
+              </button>
+            )}
           </div>
           
           {/* Correction Dialog */}

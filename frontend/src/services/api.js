@@ -169,5 +169,11 @@ export const downloadMedia = (libraryId, scope, folder = '') => {
   })
 }
 
+// Publish to DAM API
+export const getPublishConfig = () => api.get('/publish/config')
+export const publishMedia = (mediaIds, preserveFolderStructure = true) => 
+  api.post('/publish', { mediaIds, preserveFolderStructure })
+export const getPublishStatus = (mediaId) => api.get(`/publish/status/${mediaId}`)
+
 export default api
 

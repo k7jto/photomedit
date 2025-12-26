@@ -46,6 +46,14 @@ geocoding:
   userAgent: "PhotoMedit/1.0"
   rateLimit: 1.0  # seconds between requests
 
+# Digital Asset Manager (DAM) integration
+# Files are copied to the DAM folder when published
+dam:
+  enabled: true
+  name: "Immich"  # Display name for the DAM
+  url: "http://localhost:2283"  # URL to access DAM web interface (for linking)
+  folderPath: "/data/dam"  # Where to copy published files
+
 # Logging
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR

@@ -15,6 +15,7 @@ from backend.search.routes import search_bp
 from backend.upload.routes import upload_bp
 from backend.download.routes import download_bp
 from backend.admin.routes import admin_bp
+from backend.publish.routes import publish_bp
 
 
 def create_app(config_path: str = None):
@@ -305,6 +306,7 @@ def create_app(config_path: str = None):
     app.register_blueprint(upload_bp, url_prefix='/api')
     app.register_blueprint(download_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(publish_bp, url_prefix='/api')
     
     # Serve favicon
     @app.route('/favicon.ico')

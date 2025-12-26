@@ -66,6 +66,17 @@ class Config:
         logging = raw_config.get('logging', {})
         self.log_level = logging.get('level', 'INFO')
         
+        # DAM (Digital Asset Manager) integration
+        dam = raw_config.get('dam', {})
+        self.dam_enabled = dam.get('enabled', False)
+        self.dam_name = dam.get('name', 'DAM')
+        self.dam_url = dam.get('url', '')
+        self.dam_folder_path = dam.get('folderPath', '')
+        
+        # Create DAM folder if enabled and path is set
+        if self.dam_enabled and self.dam_folder_path:
+            os.makedirs(self.dam_folder_path, exist_ok=True)
+        
         # Validate required fields
         if not self.libraries:
             raise ValueError("At least one library must be configured")

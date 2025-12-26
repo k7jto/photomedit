@@ -61,3 +61,4 @@ data/
 .DS_Store
 Thumbs.db
 
+build-synology/photomedit-image.tar.gz

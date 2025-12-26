@@ -8,6 +8,7 @@ from backend.media.navigation import MediaNavigator
 from backend.security.sanitizer import PathSanitizer
 from backend.utils.geocoding import GeocodingService
 from backend.utils.corrections import get_correction, add_correction, clear_correction
+from backend.utils.publishing import get_publish_info
 from backend.validation.schemas import MediaUpdateRequest, NavigateQuery
 from pydantic import ValidationError
 import os
@@ -83,6 +84,16 @@ def get_media(media_id: str):
     else:
         logical_metadata['correctionNeeded'] = False
         logical_metadata['correctionNotes'] = ''
+    
+    # Get publish status from CSV file
+    publish_data = get_publish_info(folder_path, filename)
+    if publish_data:
+        logical_metadata['isPublished'] = True
+        logical_metadata['publishedAt'] = publish_data.get('publishedAt', '')
+        logical_metadata['publishedBy'] = publish_data.get('username', '')
+        logical_metadata['publishedTo'] = publish_data.get('damName', '')
+    else:
+        logical_metadata['isPublished'] = False
     
     return jsonify({
         'libraryId': library_id,

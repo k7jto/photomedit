@@ -32,6 +32,7 @@ services:
       - ~/Pictures:/data/pictures:rw
       - ./data/thumbnails:/data/thumbnails:rw
       - ./data/uploads:/data/uploads:rw
+      - ./data/dam:/data/dam:rw  # DAM folder for published files
     environment:
       - PHOTOMEDIT_CONFIG=/app/config.yaml
       - DB_HOST=mariadb
